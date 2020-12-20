@@ -4,11 +4,9 @@
 #include "precomp.h"
 
 #include "handle.h"
-#include "../interactivity/inc/ServiceLocator.hpp"
+#include "..\interactivity\inc\ServiceLocator.hpp"
 
 #pragma hdrstop
-
-using Microsoft::Console::Interactivity::ServiceLocator;
 
 void LockConsole()
 {

@@ -5,8 +5,8 @@
 
 #include "ConsoleWindow.hpp"
 
-#include "../inc/ServiceLocator.hpp"
-#include "../../types/inc/Viewport.hpp"
+#include "..\inc\ServiceLocator.hpp"
+#include "..\..\types\inc\Viewport.hpp"
 
 using namespace Microsoft::Console::Interactivity::OneCore;
 using namespace Microsoft::Console::Types;
@@ -125,18 +125,20 @@ void ConsoleWindow::VerticalScroll(const WORD /*wScrollCommand*/, const WORD /*w
 {
 }
 
-[[nodiscard]] HRESULT ConsoleWindow::SignalUia(_In_ EVENTID /*id*/)
+[[nodiscard]]
+HRESULT ConsoleWindow::SignalUia(_In_ EVENTID /*id*/)
 {
     return E_NOTIMPL;
 }
 
-[[nodiscard]] HRESULT ConsoleWindow::UiaSetTextAreaFocus()
+[[nodiscard]]
+HRESULT ConsoleWindow::UiaSetTextAreaFocus()
 {
     return E_NOTIMPL;
 }
 
-RECT ConsoleWindow::GetWindowRect() const noexcept
+RECT ConsoleWindow::GetWindowRect() const
 {
-    RECT rc = { 0 };
+    RECT rc = {0};
     return rc;
 }

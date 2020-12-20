@@ -10,18 +10,16 @@ using System.Linq;
 namespace ColorTool
 {
     /// <summary>
-    /// Represents a color scheme that can be applied to a console.
+    /// Represents a colorscheme that can be applied to a console.
     /// </summary>
     public class ColorScheme
     {
-        public ColorScheme(string name, uint[] colorTable, ConsoleAttributes consoleAttributes)
+        public ColorScheme(uint[] colorTable, ConsoleAttributes consoleAttributes)
         {
-            Name = name;
             ColorTable = colorTable;
             ConsoleAttributes = consoleAttributes;
         }
 
-        public string Name { get; }
         public uint[] ColorTable { get; }
         public ConsoleAttributes ConsoleAttributes { get; }
 

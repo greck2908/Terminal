@@ -13,12 +13,12 @@ using static ColorTool.ConsoleAPI;
 
 namespace ColorTool.SchemeParsers
 {
-    class IniSchemeParser : SchemeParserBase
+    class IniSchemeParser : ISchemeParser
     {
         [DllImport("kernel32")]
         private static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal, int size, string filePath);
 
-        public override string FileExtension { get; } = ".ini";
+        private const string FileExtension = ".ini";
 
         // These are in Windows Color table order - BRG, not RGB.
         internal static readonly IReadOnlyList<string> ColorNames = new[]
@@ -41,9 +41,12 @@ namespace ColorTool.SchemeParsers
             "BRIGHT_WHITE"
         };
 
-        public override string Name { get; } = "INI File Parser";
+        public string Name { get; } = "INI File Parser";
 
-        public override ColorScheme ParseScheme(string schemeName, bool reportErrors = false)
+        public bool CanParse(string schemeName) => 
+            string.Equals(Path.GetExtension(schemeName), FileExtension, StringComparison.OrdinalIgnoreCase);
+
+        public ColorScheme ParseScheme(string schemeName, bool reportErrors = false)
         {
             bool success = true;
 
@@ -121,7 +124,7 @@ namespace ColorTool.SchemeParsers
             if (colorTable != null)
             {
                 var consoleAttributes = new ConsoleAttributes(backgroundColor, foregroundColor, popupBackgroundColor, popupForegroundColor);
-                return new ColorScheme(ExtractSchemeName(schemeName), colorTable, consoleAttributes);
+                return new ColorScheme(colorTable, consoleAttributes);
             }
             else
             {
@@ -182,7 +185,7 @@ namespace ColorTool.SchemeParsers
             }
         }
 
-        private string FindIniScheme(string schemeName)
+        private static string FindIniScheme(string schemeName)
         {
             return SchemeManager.GetSearchPaths(schemeName, FileExtension).FirstOrDefault(File.Exists);
         }

@@ -12,7 +12,7 @@
 # Preprocessor Settings
 # -------------------------------------
 
-C_DEFINES               = $(C_DEFINES) -DFE_SB -D__INSIDE_WINDOWS
+C_DEFINES               = $(C_DEFINES) -DFE_SB
 
 # -------------------------------------
 # Compiler Settings
@@ -56,6 +56,7 @@ SOURCES = \
     ..\windowio.cpp \
     ..\WindowMetrics.cpp \
     ..\windowproc.cpp \
+    ..\windowtheme.cpp \
     ..\windowUiaProvider.cpp \
 
 INCLUDES = \
@@ -63,4 +64,4 @@ INCLUDES = \
     ..; \
 
 TARGETLIBS = \
-    $(ONECORE_EXTERNAL_SDK_LIB_VPATH_L)\onecore.lib  \
+    $(ONECORE_SDK_LIB_VPATH)\onecore.lib  \

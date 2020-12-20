@@ -9,8 +9,8 @@
 
 #include "winbasep.h"
 
-[[nodiscard]] HRESULT Entrypoints::StartConsoleForServerHandle(const HANDLE ServerHandle,
-                                                               const ConsoleArguments* const args)
+[[nodiscard]]
+HRESULT Entrypoints::StartConsoleForServerHandle(const HANDLE ServerHandle, const ConsoleArguments* const args)
 {
     return ConsoleCreateIoThreadLegacy(ServerHandle, args);
 }
@@ -18,10 +18,10 @@
 // this function has unreachable code due to its unusual lifetime. We
 // disable the warning about it here.
 #pragma warning(push)
-#pragma warning(disable : 4702)
+#pragma warning(disable:4702)
 
-[[nodiscard]] HRESULT Entrypoints::StartConsoleForCmdLine(_In_ PCWSTR pwszCmdLine,
-                                                          const ConsoleArguments* const args)
+[[nodiscard]]
+HRESULT Entrypoints::StartConsoleForCmdLine(_In_ PCWSTR pwszCmdLine, const ConsoleArguments* const args)
 {
     // Create a scope because we're going to exit thread if everything goes well.
     // This scope will ensure all C++ objects and smart pointers get a chance to destruct before ExitThread is called.
@@ -86,14 +86,10 @@
             HostStartupInfo.cb = sizeof(STARTUPINFO);
             GetStartupInfoW(&HostStartupInfo);
 
-            // Pass the title we were started with down to our child process.
-            // Conhost itself absolutely doesn't care about this value, but the
-            // child might.
-            StartupInformation.StartupInfo.lpTitle = HostStartupInfo.lpTitle;
-            // If we were started with Title is Link Name, then pass the flag
-            // down to the child. (the link name was already passed down above)
+            // If we were started with Title is Link Name, then pass the flag and the link name down to the child.
             if (WI_IsFlagSet(HostStartupInfo.dwFlags, STARTF_TITLEISLINKNAME))
             {
+                StartupInformation.StartupInfo.lpTitle = HostStartupInfo.lpTitle;
                 StartupInformation.StartupInfo.dwFlags |= STARTF_TITLEISLINKNAME;
             }
         }
@@ -102,7 +98,7 @@
 
         // Call first time to find size
         SIZE_T AttributeListSize;
-        InitializeProcThreadAttributeList(nullptr,
+        InitializeProcThreadAttributeList(NULL,
                                           2,
                                           0,
                                           &AttributeListSize);
@@ -119,7 +115,8 @@
                                                                      0,
                                                                      &AttributeListSize));
         // Set cleanup data for ProcThreadAttributeList when successful.
-        auto CleanupProcThreadAttribute = wil::scope_exit([&] {
+        auto CleanupProcThreadAttribute = wil::scope_exit([&]
+        {
             DeleteProcThreadAttributeList(StartupInformation.lpAttributeList);
         });
 
@@ -139,12 +136,12 @@
         HandleList[2] = StartupInformation.StartupInfo.hStdError;
 
         RETURN_IF_WIN32_BOOL_FALSE(UpdateProcThreadAttribute(StartupInformation.lpAttributeList,
-                                                             0,
-                                                             PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
-                                                             &HandleList[0],
-                                                             sizeof HandleList,
-                                                             NULL,
-                                                             NULL));
+                                                                0,
+                                                                PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+                                                                &HandleList[0],
+                                                                sizeof HandleList,
+                                                                NULL,
+                                                                NULL));
 
         // We have to copy the command line string we're given because CreateProcessW has to be called with mutable data.
         if (wcslen(pwszCmdLine) == 0)
@@ -154,11 +151,21 @@
         }
 
         // Expand any environment variables present in the command line string.
-        std::wstring cmdLine = wil::ExpandEnvironmentStringsW<std::wstring>(pwszCmdLine);
+        // - Get needed size
+        DWORD cchCmdLineExpanded = ExpandEnvironmentStringsW(pwszCmdLine, nullptr, 0);
+        RETURN_LAST_ERROR_IF(0 == cchCmdLineExpanded);
+
+        // - Allocate space to hold result
+        wistd::unique_ptr<wchar_t[]> CmdLineMutable = wil::make_unique_nothrow<wchar_t[]>(cchCmdLineExpanded);
+        RETURN_IF_NULL_ALLOC(CmdLineMutable);
+
+        // - Expand string into allocated space
+        RETURN_LAST_ERROR_IF(0 == ExpandEnvironmentStringsW(pwszCmdLine, CmdLineMutable.get(), cchCmdLineExpanded));
+
         // Call create process
         wil::unique_process_information ProcessInformation;
         RETURN_IF_WIN32_BOOL_FALSE(CreateProcessW(NULL,
-                                                  cmdLine.data(),
+                                                  CmdLineMutable.get(),
                                                   NULL,
                                                   NULL,
                                                   TRUE,

@@ -19,6 +19,7 @@ Notes:
 
 --*/
 
+
 #include "precomp.h"
 #include "TfDispAttr.h"
 
@@ -35,6 +36,9 @@ CicDisplayAttributeMgr::CicDisplayAttributeMgr()
 
 CicDisplayAttributeMgr::~CicDisplayAttributeMgr()
 {
+    if (m_pDAM) {
+        m_pDAM.Release();
+    }
 }
 
 //+---------------------------------------------------------------------------
@@ -43,43 +47,46 @@ CicDisplayAttributeMgr::~CicDisplayAttributeMgr()
 //
 //----------------------------------------------------------------------------
 
-[[nodiscard]] HRESULT CicDisplayAttributeMgr::GetDisplayAttributeTrackPropertyRange(TfEditCookie ec,
-                                                                                    ITfContext* pic,
-                                                                                    ITfRange* pRange,
-                                                                                    ITfReadOnlyProperty** ppProp,
-                                                                                    IEnumTfRanges** ppEnum,
-                                                                                    ULONG* pulNumProp)
+[[nodiscard]]
+HRESULT CicDisplayAttributeMgr::GetDisplayAttributeTrackPropertyRange(TfEditCookie ec, ITfContext *pic, ITfRange *pRange,
+                                                                      ITfReadOnlyProperty **ppProp, IEnumTfRanges **ppEnum, ULONG *pulNumProp)
 {
     HRESULT hr = E_FAIL;
-    try
-    {
-        ULONG ulNumProp = static_cast<ULONG>(m_DispAttrProp.size());
-        if (ulNumProp)
-        {
-            // TrackProperties wants an array of GUID *'s
-            auto ppguidProp = std::make_unique<const GUID*[]>(ulNumProp);
-            for (ULONG i = 0; i < ulNumProp; i++)
-            {
-                ppguidProp[i] = &m_DispAttrProp.at(i);
+
+    ULONG ulNumProp;
+    ulNumProp = (ULONG) m_DispAttrProp.Count();
+    if (ulNumProp) {
+        const GUID **ppguidProp;
+        //
+        // TrackProperties wants an array of GUID *'s
+        //
+        ppguidProp = (const GUID **) new(std::nothrow) GUID* [ulNumProp];
+        if (ppguidProp == NULL) {
+            hr = E_OUTOFMEMORY;
+        }
+        else {
+            for (ULONG i=0; i<ulNumProp; i++) {
+                ppguidProp[i] = m_DispAttrProp.GetAt(i);
             }
 
-            wil::com_ptr<ITfReadOnlyProperty> pProp;
-            if (SUCCEEDED(hr = pic->TrackProperties(ppguidProp.get(), ulNumProp, nullptr, NULL, &pProp)))
-            {
+            CComPtr<ITfReadOnlyProperty> pProp;
+            if (SUCCEEDED(hr = pic->TrackProperties(ppguidProp, ulNumProp, 0, NULL, &pProp))) {
                 hr = pProp->EnumRanges(ec, ppEnum, pRange);
-                if (SUCCEEDED(hr))
-                {
-                    *ppProp = pProp.detach();
+                if (SUCCEEDED(hr)) {
+                    *ppProp = pProp;
+                    (*ppProp)->AddRef();
                 }
+                pProp.Release();
             }
 
-            if (SUCCEEDED(hr))
-            {
+            delete [] ppguidProp;
+
+            if (SUCCEEDED(hr)) {
                 *pulNumProp = ulNumProp;
             }
         }
     }
-    CATCH_RETURN();
+
     return hr;
 }
 
@@ -89,30 +96,21 @@ CicDisplayAttributeMgr::~CicDisplayAttributeMgr()
 //
 //----------------------------------------------------------------------------
 
-[[nodiscard]] HRESULT CicDisplayAttributeMgr::GetDisplayAttributeData(ITfCategoryMgr* pcat,
-                                                                      TfEditCookie ec,
-                                                                      ITfReadOnlyProperty* pProp,
-                                                                      ITfRange* pRange,
-                                                                      TF_DISPLAYATTRIBUTE* pda,
-                                                                      TfGuidAtom* pguid,
-                                                                      ULONG /*ulNumProp*/)
+[[nodiscard]]
+HRESULT CicDisplayAttributeMgr::GetDisplayAttributeData(ITfCategoryMgr *pcat, TfEditCookie ec, ITfReadOnlyProperty *pProp, ITfRange *pRange, TF_DISPLAYATTRIBUTE *pda, TfGuidAtom *pguid, ULONG /*ulNumProp*/)
 {
     VARIANT var;
 
     HRESULT hr = E_FAIL;
 
-    if (SUCCEEDED(pProp->GetValue(ec, pRange, &var)))
-    {
+    if (SUCCEEDED(pProp->GetValue(ec, pRange, &var))) {
         FAIL_FAST_IF(!(var.vt == VT_UNKNOWN));
 
-        wil::com_ptr_nothrow<IEnumTfPropertyValue> pEnumPropertyVal;
-        if (wil::try_com_query_to(var.punkVal, &pEnumPropertyVal))
-        {
+        CComQIPtr<IEnumTfPropertyValue> pEnumPropertyVal(var.punkVal);
+        if (pEnumPropertyVal) {
             TF_PROPERTYVAL tfPropVal;
-            while (pEnumPropertyVal->Next(1, &tfPropVal, nullptr) == S_OK)
-            {
-                if (tfPropVal.varValue.vt == VT_EMPTY)
-                {
+            while (pEnumPropertyVal->Next(1, &tfPropVal, NULL) == S_OK) {
+                if (tfPropVal.varValue.vt == VT_EMPTY) {
                     continue; // prop has no value over this span
                 }
 
@@ -123,9 +121,8 @@ CicDisplayAttributeMgr::~CicDisplayAttributeMgr()
                 GUID guid;
                 pcat->GetGUID(gaVal, &guid);
 
-                wil::com_ptr_nothrow<ITfDisplayAttributeInfo> pDAI;
-                if (SUCCEEDED(m_pDAM->GetDisplayAttributeInfo(guid, &pDAI, NULL)))
-                {
+                CComPtr<ITfDisplayAttributeInfo> pDAI;
+                if (SUCCEEDED(m_pDAM->GetDisplayAttributeInfo(guid, &pDAI, NULL))) {
                     //
                     // Issue: for simple apps.
                     //
@@ -133,16 +130,15 @@ CicDisplayAttributeMgr::~CicDisplayAttributeMgr()
                     // this helper function returns only one
                     // DISPLAYATTRIBUTE structure.
                     //
-                    if (pda)
-                    {
+                    if (pda) {
                         pDAI->GetAttributeInfo(pda);
                     }
 
-                    if (pguid)
-                    {
+                    if (pguid) {
                         *pguid = gaVal;
                     }
 
+                    pDAI.Release();
                     hr = S_OK;
                     break;
                 }
@@ -159,45 +155,46 @@ CicDisplayAttributeMgr::~CicDisplayAttributeMgr()
 //
 //----------------------------------------------------------------------------
 
-[[nodiscard]] HRESULT CicDisplayAttributeMgr::InitDisplayAttributeInstance(ITfCategoryMgr* pcat)
+[[nodiscard]]
+HRESULT CicDisplayAttributeMgr::InitDisplayAttributeInstance(ITfCategoryMgr* pcat)
 {
     HRESULT hr;
 
     //
     // Create ITfDisplayAttributeMgr instance.
     //
-    if (FAILED(hr = ::CoCreateInstance(CLSID_TF_DisplayAttributeMgr, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&m_pDAM))))
-    {
+    if (FAILED(hr = m_pDAM.CoCreateInstance(CLSID_TF_DisplayAttributeMgr))) {
         return hr;
     }
 
-    wil::com_ptr_nothrow<IEnumGUID> pEnumProp;
+    CComPtr<IEnumGUID> pEnumProp;
     pcat->EnumItemsInCategory(GUID_TFCAT_DISPLAYATTRIBUTEPROPERTY, &pEnumProp);
 
     //
     // make a database for Display Attribute Properties.
     //
-    if (pEnumProp)
-    {
-        GUID guidProp;
+    if (pEnumProp) {
+         GUID guidProp;
 
-        try
-        {
-            //
-            // add System Display Attribute first.
-            // so no other Display Attribute property overwrite it.
-            //
-            m_DispAttrProp.emplace_back(GUID_PROP_ATTRIBUTE);
+         //
+         // add System Display Attribute first.
+         // so no other Display Attribute property overwrite it.
+         //
+         GUID *pguid;
 
-            while (pEnumProp->Next(1, &guidProp, nullptr) == S_OK)
-            {
-                if (!IsEqualGUID(guidProp, GUID_PROP_ATTRIBUTE))
-                {
-                    m_DispAttrProp.emplace_back(guidProp);
-                }
-            }
-        }
-        CATCH_RETURN();
+         pguid = m_DispAttrProp.Append();
+         if (pguid != NULL) {
+             *pguid = GUID_PROP_ATTRIBUTE;
+         }
+
+         while(pEnumProp->Next(1, &guidProp, NULL) == S_OK) {
+             if (!IsEqualGUID(guidProp, GUID_PROP_ATTRIBUTE)) {
+                 pguid = m_DispAttrProp.Append();
+                 if (pguid != NULL) {
+                     *pguid = guidProp;
+                 }
+             }
+         }
     }
     return hr;
 }

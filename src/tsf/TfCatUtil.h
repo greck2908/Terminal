@@ -28,11 +28,13 @@ public:
     virtual ~CicCategoryMgr();
 
 public:
-    [[nodiscard]] HRESULT GetGUIDFromGUIDATOM(TfGuidAtom guidatom, GUID* pguid);
-    [[nodiscard]] HRESULT InitCategoryInstance();
+    [[nodiscard]]
+    HRESULT GetGUIDFromGUIDATOM(TfGuidAtom guidatom, GUID *pguid);
+    [[nodiscard]]
+    HRESULT InitCategoryInstance();
 
-    inline ITfCategoryMgr* GetCategoryMgr() { return m_pcat.get(); }
+    inline ITfCategoryMgr* GetCategoryMgr() { return m_pcat; }
 
 private:
-    wil::com_ptr_nothrow<ITfCategoryMgr> m_pcat;
+    CComQIPtr<ITfCategoryMgr>          m_pcat;
 };

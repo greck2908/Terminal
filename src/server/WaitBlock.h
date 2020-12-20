@@ -17,7 +17,7 @@ Revision History:
 
 #pragma once
 
-#include "../host/conapi.h"
+#include "..\host\conapi.h"
 #include "IWaitRoutine.h"
 #include "WaitTerminationReason.h"
 
@@ -28,12 +28,15 @@ class ConsoleWaitQueue;
 class ConsoleWaitBlock
 {
 public:
+
     ~ConsoleWaitBlock();
 
     bool Notify(const WaitTerminationReason TerminationReason);
 
-    [[nodiscard]] static HRESULT s_CreateWait(_Inout_ CONSOLE_API_MSG* const pWaitReplymessage,
-                                              _In_ IWaitRoutine* const pWaiter);
+    [[nodiscard]]
+    static HRESULT s_CreateWait(_Inout_ CONSOLE_API_MSG* const pWaitReplymessage,
+                                _In_ IWaitRoutine* const pWaiter);
+
 
 private:
     ConsoleWaitBlock(_In_ ConsoleWaitQueue* const pProcessQueue,

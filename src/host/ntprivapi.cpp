@@ -5,7 +5,8 @@
 
 #include "NtPrivApi.hpp"
 
-[[nodiscard]] NTSTATUS NtPrivApi::s_GetProcessParentId(_Inout_ PULONG ProcessId)
+[[nodiscard]]
+NTSTATUS NtPrivApi::s_GetProcessParentId(_Inout_ PULONG ProcessId)
 {
     // TODO: Get Parent current not really available without winternl + NtQueryInformationProcess. http://osgvsowi/8394495
     OBJECT_ATTRIBUTES oa;
@@ -13,7 +14,7 @@
 
     CLIENT_ID ClientId;
     ClientId.UniqueProcess = UlongToHandle(*ProcessId);
-    ClientId.UniqueThread = nullptr;
+    ClientId.UniqueThread = 0;
 
     HANDLE ProcessHandle;
     NTSTATUS Status = s_NtOpenProcess(&ProcessHandle, PROCESS_QUERY_LIMITED_INFORMATION, &oa, &ClientId);
@@ -37,16 +38,17 @@
     return STATUS_SUCCESS;
 }
 
-[[nodiscard]] NTSTATUS NtPrivApi::s_NtOpenProcess(_Out_ PHANDLE ProcessHandle,
-                                                  _In_ ACCESS_MASK DesiredAccess,
-                                                  _In_ POBJECT_ATTRIBUTES ObjectAttributes,
-                                                  _In_opt_ PCLIENT_ID ClientId)
+[[nodiscard]]
+NTSTATUS NtPrivApi::s_NtOpenProcess(_Out_ PHANDLE ProcessHandle,
+                                    _In_ ACCESS_MASK DesiredAccess,
+                                    _In_ POBJECT_ATTRIBUTES ObjectAttributes,
+                                    _In_opt_ PCLIENT_ID ClientId)
 {
     HMODULE hNtDll = _Instance()._hNtDll;
 
     if (hNtDll != nullptr)
     {
-        typedef NTSTATUS (*PfnNtOpenProcess)(HANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PCLIENT_ID ClientId);
+        typedef NTSTATUS(*PfnNtOpenProcess)(HANDLE ProcessHandle, ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes, PCLIENT_ID ClientId);
 
         static PfnNtOpenProcess pfn = (PfnNtOpenProcess)GetProcAddress(hNtDll, "NtOpenProcess");
 
@@ -59,17 +61,18 @@
     return STATUS_UNSUCCESSFUL;
 }
 
-[[nodiscard]] NTSTATUS NtPrivApi::s_NtQueryInformationProcess(_In_ HANDLE ProcessHandle,
-                                                              _In_ PROCESSINFOCLASS ProcessInformationClass,
-                                                              _Out_ PVOID ProcessInformation,
-                                                              _In_ ULONG ProcessInformationLength,
-                                                              _Out_opt_ PULONG ReturnLength)
+[[nodiscard]]
+NTSTATUS NtPrivApi::s_NtQueryInformationProcess(_In_ HANDLE ProcessHandle,
+                                                _In_ PROCESSINFOCLASS ProcessInformationClass,
+                                                _Out_ PVOID ProcessInformation,
+                                                _In_ ULONG ProcessInformationLength,
+                                                _Out_opt_ PULONG ReturnLength)
 {
     HMODULE hNtDll = _Instance()._hNtDll;
 
     if (hNtDll != nullptr)
     {
-        typedef NTSTATUS (*PfnNtQueryInformationProcess)(HANDLE ProcessHandle, PROCESSINFOCLASS ProcessInformationClass, PVOID ProcessInformation, ULONG ProcessInformationLength, PULONG ReturnLength);
+        typedef NTSTATUS(*PfnNtQueryInformationProcess)(HANDLE ProcessHandle, PROCESSINFOCLASS ProcessInformationClass, PVOID ProcessInformation, ULONG ProcessInformationLength, PULONG ReturnLength);
 
         static PfnNtQueryInformationProcess pfn = (PfnNtQueryInformationProcess)GetProcAddress(hNtDll, "NtQueryInformationProcess");
 
@@ -82,13 +85,14 @@
     return STATUS_UNSUCCESSFUL;
 }
 
-[[nodiscard]] NTSTATUS NtPrivApi::s_NtClose(_In_ HANDLE Handle)
+[[nodiscard]]
+NTSTATUS NtPrivApi::s_NtClose(_In_ HANDLE Handle)
 {
     HMODULE hNtDll = _Instance()._hNtDll;
 
     if (hNtDll != nullptr)
     {
-        typedef NTSTATUS (*PfnNtClose)(HANDLE Handle);
+        typedef NTSTATUS(*PfnNtClose)(HANDLE Handle);
 
         static PfnNtClose pfn = (PfnNtClose)GetProcAddress(hNtDll, "NtClose");
 

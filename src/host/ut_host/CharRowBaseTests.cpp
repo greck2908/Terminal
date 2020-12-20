@@ -19,13 +19,14 @@ class CharRowBaseTests
     const size_t rowWidth = 80;
     const Ucs2CharRow::glyph_type ucs2Glyph = L'a';
     // hiragana ka U+304B
-    const Utf8CharRow::glyph_type utf8Glyph = { '\xE3', '\x81', '\x8B' };
+    const Utf8CharRow::glyph_type utf8Glyph = { '\xE3', '\x81', '\x8B'};
 
     const Ucs2CharRow::glyph_type ucs2DefaultGlyph = UNICODE_SPACE;
     const Utf8CharRow::glyph_type utf8DefaultGlyph = { UNICODE_SPACE };
 
     Ucs2CharRow::string_type ucs2Text = L"Loremipsumdolorsitamet,consecteturadipiscingelit.Nullametrutrummetus.Namquiseratal";
     std::vector<Utf8CharRow::glyph_type> utf8Text;
+
 
     Ucs2CharRow ucs2CharRow;
     Utf8CharRow utf8CharRow;
@@ -49,14 +50,14 @@ class CharRowBaseTests
     {
         switch (pCharRow->GetSupportedEncoding())
         {
-        case ICharRow::SupportedEncoding::Ucs2:
-            static_cast<Ucs2CharRow* const>(pCharRow)->GetGlyphAt(column) = ucs2Glyph;
-            break;
-        case ICharRow::SupportedEncoding::Utf8:
-            static_cast<Utf8CharRow* const>(pCharRow)->GetGlyphAt(column) = utf8Glyph;
-            break;
-        default:
-            VERIFY_IS_TRUE(false);
+            case ICharRow::SupportedEncoding::Ucs2:
+                static_cast<Ucs2CharRow* const>(pCharRow)->GetGlyphAt(column) = ucs2Glyph;
+                break;
+            case ICharRow::SupportedEncoding::Utf8:
+                static_cast<Utf8CharRow* const>(pCharRow)->GetGlyphAt(column) = utf8Glyph;
+                break;
+            default:
+                VERIFY_IS_TRUE(false);
         }
     }
 
@@ -66,28 +67,28 @@ class CharRowBaseTests
         VERIFY_ARE_EQUAL(attrs.size(), rowWidth);
         switch (pCharRow->GetSupportedEncoding())
         {
-        case ICharRow::SupportedEncoding::Ucs2:
-        {
-            auto& cells = static_cast<Ucs2CharRow* const>(pCharRow)->_data;
-            for (size_t i = 0; i < cells.size(); ++i)
+            case ICharRow::SupportedEncoding::Ucs2:
             {
-                cells[i].first = ucs2Text[i];
-                cells[i].second = attrs[i];
+                auto& cells = static_cast<Ucs2CharRow* const>(pCharRow)->_data;
+                for (size_t i = 0; i < cells.size(); ++i)
+                {
+                    cells[i].first = ucs2Text[i];
+                    cells[i].second = attrs[i];
+                }
+                break;
             }
-            break;
-        }
-        case ICharRow::SupportedEncoding::Utf8:
-        {
-            auto& cells = static_cast<Utf8CharRow* const>(pCharRow)->_data;
-            for (size_t i = 0; i < cells.size(); ++i)
+            case ICharRow::SupportedEncoding::Utf8:
             {
-                cells[i].first = utf8Text[i];
-                cells[i].second = attrs[i];
+                auto& cells = static_cast<Utf8CharRow* const>(pCharRow)->_data;
+                for (size_t i = 0; i < cells.size(); ++i)
+                {
+                    cells[i].first = utf8Text[i];
+                    cells[i].second = attrs[i];
+                }
+                break;
             }
-            break;
-        }
-        default:
-            VERIFY_IS_TRUE(false);
+            default:
+                VERIFY_IS_TRUE(false);
         }
     }
 
@@ -120,22 +121,22 @@ class CharRowBaseTests
             // check that cell data was initialized correctly
             switch (pCharRow->GetSupportedEncoding())
             {
-            case ICharRow::SupportedEncoding::Ucs2:
-                for (auto& cell : static_cast<Ucs2CharRow*>(pCharRow)->_data)
-                {
-                    VERIFY_ARE_EQUAL(cell.first, ucs2DefaultGlyph);
-                    VERIFY_IS_TRUE(cell.second.IsSingle());
-                }
-                break;
-            case ICharRow::SupportedEncoding::Utf8:
-                for (auto& cell : static_cast<Utf8CharRow*>(pCharRow)->_data)
-                {
-                    VERIFY_ARE_EQUAL(cell.first, utf8DefaultGlyph);
-                    VERIFY_IS_TRUE(cell.second.IsSingle());
-                }
-                break;
-            default:
-                VERIFY_IS_TRUE(false);
+                case ICharRow::SupportedEncoding::Ucs2:
+                    for (auto& cell : static_cast<Ucs2CharRow*>(pCharRow)->_data)
+                    {
+                        VERIFY_ARE_EQUAL(cell.first, ucs2DefaultGlyph);
+                        VERIFY_IS_TRUE(cell.second.IsSingle());
+                    }
+                    break;
+                case ICharRow::SupportedEncoding::Utf8:
+                    for (auto& cell : static_cast<Utf8CharRow*>(pCharRow)->_data)
+                    {
+                        VERIFY_ARE_EQUAL(cell.first, utf8DefaultGlyph);
+                        VERIFY_IS_TRUE(cell.second.IsSingle());
+                    }
+                    break;
+                default:
+                    VERIFY_IS_TRUE(false);
             }
         }
     }
@@ -164,7 +165,6 @@ class CharRowBaseTests
 
         for (ICharRow* const pCharRow : rows)
         {
-            // clang-format off
             std::vector<std::tuple<std::wstring,
                                    std::vector<size_t>, // locations to fill with characters
                                    size_t, // MeasureLeft value
@@ -220,7 +220,6 @@ class CharRowBaseTests
                     rowWidth - 2
                 },
             };
-            // clang-format on
 
             for (auto data : testData)
             {
@@ -256,17 +255,17 @@ class CharRowBaseTests
             auto choice = rand() % 2;
             switch (choice)
             {
-            case 0:
-                attr.SetSingle();
-                break;
-            case 1:
-                attr.SetLeading();
-                break;
-            case 2:
-                attr.SetTrailing();
-                break;
-            default:
-                VERIFY_IS_TRUE(false);
+                case 0:
+                    attr.SetSingle();
+                    break;
+                case 1:
+                    attr.SetLeading();
+                    break;
+                case 2:
+                    attr.SetTrailing();
+                    break;
+                default:
+                    VERIFY_IS_TRUE(false);
             }
         }
 
@@ -288,40 +287,40 @@ class CharRowBaseTests
 
             switch (pCharRow->GetSupportedEncoding())
             {
-            case ICharRow::SupportedEncoding::Ucs2:
-                // data not clipped should not have changed
-                for (size_t i = 0; i < smallSize; ++i)
-                {
-                    auto cell = static_cast<Ucs2CharRow*>(pCharRow)->_data[i];
-                    VERIFY_ARE_EQUAL(cell.first, ucs2Text[i]);
-                    VERIFY_ARE_EQUAL(cell.second, attrs[i]);
-                }
-                // newly added cells should be set to the defaults
-                for (size_t i = smallSize + 1; i < bigSize; ++i)
-                {
-                    auto cell = static_cast<Ucs2CharRow*>(pCharRow)->_data[i];
-                    VERIFY_ARE_EQUAL(cell.first, ucs2DefaultGlyph);
-                    VERIFY_IS_TRUE(cell.second.IsSingle());
-                }
-                break;
-            case ICharRow::SupportedEncoding::Utf8:
-                // data not clipped should not have changed
-                for (size_t i = 0; i < smallSize; ++i)
-                {
-                    auto cell = static_cast<Utf8CharRow*>(pCharRow)->_data[i];
-                    VERIFY_ARE_EQUAL(cell.first, utf8Text[i]);
-                    VERIFY_ARE_EQUAL(cell.second, attrs[i]);
-                }
-                // newly added cells should be set to the defaults
-                for (size_t i = smallSize + 1; i < bigSize; ++i)
-                {
-                    auto cell = static_cast<Utf8CharRow*>(pCharRow)->_data[i];
-                    VERIFY_ARE_EQUAL(cell.first, utf8DefaultGlyph);
-                    VERIFY_IS_TRUE(cell.second.IsSingle());
-                }
-                break;
-            default:
-                VERIFY_IS_TRUE(false);
+                case ICharRow::SupportedEncoding::Ucs2:
+                    // data not clipped should not have changed
+                    for (size_t i = 0; i < smallSize; ++i)
+                    {
+                        auto cell = static_cast<Ucs2CharRow*>(pCharRow)->_data[i];
+                        VERIFY_ARE_EQUAL(cell.first, ucs2Text[i]);
+                        VERIFY_ARE_EQUAL(cell.second, attrs[i]);
+                    }
+                    // newly added cells should be set to the defaults
+                    for (size_t i = smallSize + 1; i < bigSize; ++i)
+                    {
+                        auto cell = static_cast<Ucs2CharRow*>(pCharRow)->_data[i];
+                        VERIFY_ARE_EQUAL(cell.first, ucs2DefaultGlyph);
+                        VERIFY_IS_TRUE(cell.second.IsSingle());
+                    }
+                    break;
+                case ICharRow::SupportedEncoding::Utf8:
+                    // data not clipped should not have changed
+                    for (size_t i = 0; i < smallSize; ++i)
+                    {
+                        auto cell = static_cast<Utf8CharRow*>(pCharRow)->_data[i];
+                        VERIFY_ARE_EQUAL(cell.first, utf8Text[i]);
+                        VERIFY_ARE_EQUAL(cell.second, attrs[i]);
+                    }
+                    // newly added cells should be set to the defaults
+                    for (size_t i = smallSize + 1; i < bigSize; ++i)
+                    {
+                        auto cell = static_cast<Utf8CharRow*>(pCharRow)->_data[i];
+                        VERIFY_ARE_EQUAL(cell.first, utf8DefaultGlyph);
+                        VERIFY_IS_TRUE(cell.second.IsSingle());
+                    }
+                    break;
+                default:
+                    VERIFY_IS_TRUE(false);
             }
         }
     }
@@ -346,24 +345,24 @@ class CharRowBaseTests
             for (auto index : eraseIndices)
             {
                 pCharRow->ClearCell(index);
-                switch (pCharRow->GetSupportedEncoding())
+                switch(pCharRow->GetSupportedEncoding())
                 {
-                case ICharRow::SupportedEncoding::Ucs2:
-                {
-                    auto& cell = static_cast<Ucs2CharRow*>(pCharRow)->_data[index];
-                    VERIFY_ARE_EQUAL(cell.first, ucs2DefaultGlyph);
-                    VERIFY_ARE_EQUAL(cell.second, DbcsAttribute::Attribute::Single);
-                    break;
-                }
-                case ICharRow::SupportedEncoding::Utf8:
-                {
-                    auto& cell = static_cast<Utf8CharRow*>(pCharRow)->_data[index];
-                    VERIFY_ARE_EQUAL(cell.first, utf8DefaultGlyph);
-                    VERIFY_ARE_EQUAL(cell.second, DbcsAttribute::Attribute::Single);
-                    break;
-                }
-                default:
-                    VERIFY_IS_TRUE(false);
+                    case ICharRow::SupportedEncoding::Ucs2:
+                    {
+                        auto& cell = static_cast<Ucs2CharRow*>(pCharRow)->_data[index];
+                        VERIFY_ARE_EQUAL(cell.first, ucs2DefaultGlyph);
+                        VERIFY_ARE_EQUAL(cell.second, DbcsAttribute::Attribute::Single);
+                        break;
+                    }
+                    case ICharRow::SupportedEncoding::Utf8:
+                    {
+                        auto& cell = static_cast<Utf8CharRow*>(pCharRow)->_data[index];
+                        VERIFY_ARE_EQUAL(cell.first, utf8DefaultGlyph);
+                        VERIFY_ARE_EQUAL(cell.second, DbcsAttribute::Attribute::Single);
+                        break;
+                    }
+                    default:
+                        VERIFY_IS_TRUE(false);
                 }
             }
         }
@@ -389,24 +388,24 @@ class CharRowBaseTests
             for (auto index : eraseIndices)
             {
                 pCharRow->ClearGlyph(index);
-                switch (pCharRow->GetSupportedEncoding())
+                switch(pCharRow->GetSupportedEncoding())
                 {
-                case ICharRow::SupportedEncoding::Ucs2:
-                {
-                    auto& cell = static_cast<Ucs2CharRow*>(pCharRow)->_data[index];
-                    VERIFY_ARE_EQUAL(cell.first, ucs2DefaultGlyph);
-                    VERIFY_ARE_EQUAL(cell.second, DbcsAttribute::Attribute::Leading);
-                    break;
-                }
-                case ICharRow::SupportedEncoding::Utf8:
-                {
-                    auto& cell = static_cast<Utf8CharRow*>(pCharRow)->_data[index];
-                    VERIFY_ARE_EQUAL(cell.first, utf8DefaultGlyph);
-                    VERIFY_ARE_EQUAL(cell.second, DbcsAttribute::Attribute::Leading);
-                    break;
-                }
-                default:
-                    VERIFY_IS_TRUE(false);
+                    case ICharRow::SupportedEncoding::Ucs2:
+                    {
+                        auto& cell = static_cast<Ucs2CharRow*>(pCharRow)->_data[index];
+                        VERIFY_ARE_EQUAL(cell.first, ucs2DefaultGlyph);
+                        VERIFY_ARE_EQUAL(cell.second, DbcsAttribute::Attribute::Leading);
+                        break;
+                    }
+                    case ICharRow::SupportedEncoding::Utf8:
+                    {
+                        auto& cell = static_cast<Utf8CharRow*>(pCharRow)->_data[index];
+                        VERIFY_ARE_EQUAL(cell.first, utf8DefaultGlyph);
+                        VERIFY_ARE_EQUAL(cell.second, DbcsAttribute::Attribute::Leading);
+                        break;
+                    }
+                    default:
+                        VERIFY_IS_TRUE(false);
                 }
             }
         }
@@ -434,40 +433,40 @@ class CharRowBaseTests
             // fill cells with data
             SetCellData(pCharRow, attrs);
 
-            switch (pCharRow->GetSupportedEncoding())
+            switch(pCharRow->GetSupportedEncoding())
             {
-            case ICharRow::SupportedEncoding::Ucs2:
-            {
-                Ucs2CharRow::string_type expectedText = L"";
-                for (size_t i = 0; i < ucs2Text.size(); ++i)
+                case ICharRow::SupportedEncoding::Ucs2:
                 {
-                    if (i % 2 == 0)
+                    Ucs2CharRow::string_type expectedText = L"";
+                    for (size_t i = 0; i < ucs2Text.size(); ++i)
                     {
-                        expectedText += ucs2Text[i];
-                    }
-                }
-                VERIFY_ARE_EQUAL(expectedText, static_cast<Ucs2CharRow*>(pCharRow)->GetText());
-                break;
-            }
-            case ICharRow::SupportedEncoding::Utf8:
-            {
-                Utf8CharRow::string_type expectedText = "";
-                for (size_t i = 0; i < utf8Text.size(); ++i)
-                {
-                    if (i % 2 == 0)
-                    {
-                        auto glyph = utf8Text[i];
-                        for (auto ch : glyph)
+                        if (i % 2 == 0)
                         {
-                            expectedText += ch;
+                            expectedText += ucs2Text[i];
                         }
                     }
+                    VERIFY_ARE_EQUAL(expectedText, static_cast<Ucs2CharRow*>(pCharRow)->GetText());
+                    break;
                 }
-                VERIFY_ARE_EQUAL(expectedText, static_cast<Utf8CharRow*>(pCharRow)->GetText());
-                break;
-            }
-            default:
-                VERIFY_IS_TRUE(false);
+                case ICharRow::SupportedEncoding::Utf8:
+                {
+                    Utf8CharRow::string_type expectedText = "";
+                    for (size_t i = 0; i < utf8Text.size(); ++i)
+                    {
+                        if (i % 2 == 0)
+                        {
+                            auto glyph = utf8Text[i];
+                            for (auto ch : glyph)
+                            {
+                                expectedText += ch;
+                            }
+                        }
+                    }
+                    VERIFY_ARE_EQUAL(expectedText, static_cast<Utf8CharRow*>(pCharRow)->GetText());
+                    break;
+                }
+                default:
+                    VERIFY_IS_TRUE(false);
             }
         }
     }
@@ -483,35 +482,36 @@ class CharRowBaseTests
             SetCellData(pCharRow, attrs);
 
             // make sure data received from iterators matches data written
-            switch (pCharRow->GetSupportedEncoding())
+            switch(pCharRow->GetSupportedEncoding())
             {
-            case ICharRow::SupportedEncoding::Ucs2:
-            {
-                size_t index = 0;
-                const Ucs2CharRow& charRow = *static_cast<const Ucs2CharRow* const>(pCharRow);
-                for (Ucs2CharRow::const_iterator it = charRow.cbegin(); it != charRow.cend(); ++it)
+                case ICharRow::SupportedEncoding::Ucs2:
                 {
-                    VERIFY_ARE_EQUAL(ucs2Text[index], it->first);
-                    VERIFY_ARE_EQUAL(attrs[index], it->second);
-                    ++index;
+                    size_t index = 0;
+                    const Ucs2CharRow& charRow = *static_cast<const Ucs2CharRow* const>(pCharRow);
+                    for (Ucs2CharRow::const_iterator it = charRow.cbegin(); it != charRow.cend(); ++it)
+                    {
+                        VERIFY_ARE_EQUAL(ucs2Text[index], it->first);
+                        VERIFY_ARE_EQUAL(attrs[index], it->second);
+                        ++index;
+                    }
+                    break;
                 }
-                break;
-            }
-            case ICharRow::SupportedEncoding::Utf8:
-            {
-                size_t index = 0;
-                const Utf8CharRow& charRow = *static_cast<const Utf8CharRow* const>(pCharRow);
-                for (Utf8CharRow::const_iterator it = charRow.cbegin(); it != charRow.cend(); ++it)
+                case ICharRow::SupportedEncoding::Utf8:
                 {
-                    VERIFY_ARE_EQUAL(utf8Text[index], it->first);
-                    VERIFY_ARE_EQUAL(attrs[index], it->second);
-                    ++index;
+                    size_t index = 0;
+                    const Utf8CharRow& charRow = *static_cast<const Utf8CharRow* const>(pCharRow);
+                    for (Utf8CharRow::const_iterator it = charRow.cbegin(); it != charRow.cend(); ++it)
+                    {
+                        VERIFY_ARE_EQUAL(utf8Text[index], it->first);
+                        VERIFY_ARE_EQUAL(attrs[index], it->second);
+                        ++index;
+                    }
+                    break;
                 }
-                break;
-            }
-            default:
-                VERIFY_IS_TRUE(false);
+                default:
+                    VERIFY_IS_TRUE(false);
             }
         }
     }
+
 };

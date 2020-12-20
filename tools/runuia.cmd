@@ -1,7 +1,6 @@
 @echo off
 
 rem Run the console UI Automation tests.
-rem Keep this file in sync with tests.xml
 
 rem Get AppDriver going first... You'll have to close it yourself.
 

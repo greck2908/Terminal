@@ -23,8 +23,9 @@ namespace Microsoft::Console
         PtySignalInputThread(_In_ wil::unique_hfile hPipe);
         ~PtySignalInputThread();
 
-        [[nodiscard]] HRESULT Start() noexcept;
-        static DWORD WINAPI StaticThreadProc(_In_ LPVOID lpParameter);
+        [[nodiscard]]
+        HRESULT Start() noexcept;
+        static DWORD StaticThreadProc(_In_ LPVOID lpParameter);
 
         // Prevent copying and assignment.
         PtySignalInputThread(const PtySignalInputThread&) = delete;
@@ -33,7 +34,8 @@ namespace Microsoft::Console
         void ConnectConsole() noexcept;
 
     private:
-        [[nodiscard]] HRESULT _InputThread();
+        [[nodiscard]]
+        HRESULT _InputThread();
         bool _GetData(_Out_writes_bytes_(cbBuffer) void* const pBuffer, const DWORD cbBuffer);
         void _Shutdown();
 

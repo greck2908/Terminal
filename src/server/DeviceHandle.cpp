@@ -6,7 +6,7 @@
 
 #include "WinNTControl.h"
 
-#define FILE_SYNCHRONOUS_IO_NONALERT 0x00000020
+#define FILE_SYNCHRONOUS_IO_NONALERT            0x00000020
 
 /*++
 Routine Description:
@@ -24,7 +24,8 @@ Arguments:
 Return Value:
 - NTSTATUS indicating if the client was successfully created.
 --*/
-[[nodiscard]] NTSTATUS
+[[nodiscard]]
+NTSTATUS
 DeviceHandle::CreateClientHandle(
     _Out_ PHANDLE Handle,
     _In_ HANDLE ServerHandle,
@@ -50,7 +51,8 @@ Arguments:
 Return Value:
 - NTSTATUS indicating if the console was successfully created.
 --*/
-[[nodiscard]] NTSTATUS
+[[nodiscard]]
+NTSTATUS
 DeviceHandle::CreateServerHandle(
     _Out_ PHANDLE Handle,
     _In_ BOOLEAN Inheritable)
@@ -58,7 +60,7 @@ DeviceHandle::CreateServerHandle(
     return _CreateHandle(Handle,
                          L"\\Device\\ConDrv\\Server",
                          GENERIC_ALL,
-                         nullptr,
+                         NULL,
                          Inheritable,
                          0);
 }
@@ -80,7 +82,8 @@ Arguments:
 Return Value:
 - NTSTATUS indicating if the handle was successfully created.
 --*/
-[[nodiscard]] NTSTATUS
+[[nodiscard]]
+NTSTATUS
 DeviceHandle::_CreateHandle(
     _Out_ PHANDLE Handle,
     _In_ PCWSTR DeviceName,
@@ -98,18 +101,16 @@ DeviceHandle::_CreateHandle(
     }
 
     UNICODE_STRING Name;
-#pragma warning(suppress : 26492) // const_cast is prohibited, but we can't avoid it for filling UNICODE_STRING.
-    Name.Buffer = const_cast<wchar_t*>(DeviceName);
-    Name.Length = gsl::narrow_cast<USHORT>((wcslen(DeviceName) * sizeof(wchar_t)));
+    Name.Buffer = (wchar_t*)DeviceName;
+    Name.Length = (USHORT)(wcslen(DeviceName) * sizeof(wchar_t));
     Name.MaximumLength = Name.Length + sizeof(wchar_t);
 
     OBJECT_ATTRIBUTES ObjectAttributes;
-#pragma warning(suppress : 26477) // The QOS part of this macro in the define is 0. Can't fix that.
     InitializeObjectAttributes(&ObjectAttributes,
                                &Name,
                                Flags,
                                Parent,
-                               nullptr);
+                               NULL);
 
     IO_STATUS_BLOCK IoStatus;
     return WinNTControl::NtOpenFile(Handle,

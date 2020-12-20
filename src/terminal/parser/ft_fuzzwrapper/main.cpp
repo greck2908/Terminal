@@ -4,8 +4,8 @@
 #include "precomp.h"
 
 #include "echoDispatch.hpp"
-#include "../stateMachine.hpp"
-#include "../OutputStateMachineEngine.hpp"
+#include "..\stateMachine.hpp"
+#include "..\OutputStateMachineEngine.hpp"
 
 using namespace Microsoft::Console::VirtualTerminal;
 
@@ -60,10 +60,8 @@ int __cdecl wmain(int argc, wchar_t* argv[])
         hFile = _wfopen(argv[1], L"r");
         wchar_t wch;
         bool fGotChar = GetChar(&wch);
-        auto dispatch = std::make_unique<EchoDispatch>();
-        auto engine = std::make_unique<OutputStateMachineEngine>(std::move(dispatch));
 
-        StateMachine machine(std::move(engine));
+        StateMachine machine(new OutputStateMachineEngine(new EchoDispatch));
 
         wprintf(L"Sending characters to state machine...\r\n");
         while (fGotChar)
@@ -72,10 +70,7 @@ int __cdecl wmain(int argc, wchar_t* argv[])
             fGotChar = GetChar(&wch);
         }
 
-        if (hFile)
-        {
-            fclose(hFile);
-        }
+        fclose(hFile);
         wprintf(L"Done.\r\n");
     }
 

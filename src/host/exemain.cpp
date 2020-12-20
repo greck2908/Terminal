@@ -5,8 +5,8 @@
 
 #include "ConsoleArguments.hpp"
 #include "srvinit.h"
-#include "../server/Entrypoints.h"
-#include "../interactivity/inc/ServiceLocator.hpp"
+#include "..\server\Entrypoints.h"
+#include "..\interactivity\inc\ServiceLocator.hpp"
 
 // Define TraceLogging provider
 TRACELOGGING_DEFINE_PROVIDER(
@@ -16,12 +16,12 @@ TRACELOGGING_DEFINE_PROVIDER(
     (0x770aa552, 0x671a, 0x5e97, 0x57, 0x9b, 0x15, 0x17, 0x09, 0xec, 0x0d, 0xbd),
     TraceLoggingOptionMicrosoftTelemetry());
 
-static bool ConhostV2ForcedInRegistry()
+static bool ShouldUseConhostV2()
 {
     // If the registry value doesn't exist, or exists and is non-zero, we should default to using the v2 console.
     // Otherwise, in the case of an explicit value of 0, we should use the legacy console.
     bool fShouldUseConhostV2 = true;
-    PCSTR pszErrorDescription = nullptr;
+    PCSTR pszErrorDescription = NULL;
     bool fIgnoreError = false;
 
     // open HKCU\Console
@@ -40,9 +40,10 @@ static bool ConhostV2ForcedInRegistry()
                                    (PBYTE)&dwValue,
                                    &cbValue);
 
+
         if (ERROR_SUCCESS == lStatus &&
-            dwType == REG_DWORD && // response is a DWORD
-            cbValue == sizeof(dwValue)) // response data exists
+            dwType == REG_DWORD &&                     // response is a DWORD
+            cbValue == sizeof(dwValue))                // response data exists
         {
             // Value exists. If non-zero use v2 console.
             fShouldUseConhostV2 = dwValue != 0;
@@ -63,7 +64,8 @@ static bool ConhostV2ForcedInRegistry()
     return fShouldUseConhostV2;
 }
 
-[[nodiscard]] static HRESULT ValidateServerHandle(const HANDLE handle)
+[[nodiscard]]
+static HRESULT ValidateServerHandle(const HANDLE handle)
 {
     // Make sure this is a console file.
     FILE_FS_DEVICE_INFORMATION DeviceInformation;
@@ -83,24 +85,13 @@ static bool ConhostV2ForcedInRegistry()
     }
 }
 
-static bool ShouldUseLegacyConhost(const ConsoleArguments& args)
+static bool ShouldUseLegacyConhost(const bool fForceV1)
 {
-    if (args.InConptyMode())
-    {
-        return false;
-    }
-
-    if (args.GetForceV1())
-    {
-        return true;
-    }
-
-    // Per the documentation in ConhostV2ForcedInRegistry, it checks the value
-    // of HKCU\Console:ForceV2. If it's *not found* or nonzero, "v2" is forced.
-    return !ConhostV2ForcedInRegistry();
+    return fForceV1 || !ShouldUseConhostV2();
 }
 
-[[nodiscard]] static HRESULT ActivateLegacyConhost(const HANDLE handle)
+[[nodiscard]]
+static HRESULT ActivateLegacyConhost(const HANDLE handle)
 {
     HRESULT hr = S_OK;
 
@@ -108,15 +99,17 @@ static bool ShouldUseLegacyConhost(const ConsoleArguments& args)
     // because there's already a count of how many total processes were launched.
     // Total - legacy = new console.
     // We expect legacy launches to be infrequent enough to not cause an issue.
-    TraceLoggingWrite(g_ConhostLauncherProvider, "IsLegacyLoaded", TraceLoggingBool(true, "ConsoleLegacy"), TraceLoggingKeyword(MICROSOFT_KEYWORD_TELEMETRY));
+    TraceLoggingWrite(g_ConhostLauncherProvider, "IsLegacyLoaded",
+                      TraceLoggingBool(true, "ConsoleLegacy"),
+                      TraceLoggingKeyword(MICROSOFT_KEYWORD_TELEMETRY));
 
-    const PCWSTR pszConhostDllName = L"ConhostV1.dll";
+    PCWSTR pszConhostDllName = L"ConhostV1.dll";
 
     // Load our implementation, and then Load/Launch the IO thread.
-    wil::unique_hmodule hConhostBin(LoadLibraryExW(pszConhostDllName, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32));
+    wil::unique_hmodule hConhostBin(LoadLibraryExW(pszConhostDllName, NULL, LOAD_LIBRARY_SEARCH_SYSTEM32));
     if (hConhostBin.get() != nullptr)
     {
-        typedef NTSTATUS (*PFNCONSOLECREATEIOTHREAD)(__in HANDLE Server);
+        typedef NTSTATUS(*PFNCONSOLECREATEIOTHREAD)(__in HANDLE Server);
 
         PFNCONSOLECREATEIOTHREAD pfnConsoleCreateIoThread = (PFNCONSOLECREATEIOTHREAD)GetProcAddress(hConhostBin.get(), "ConsoleCreateIoThread");
         if (pfnConsoleCreateIoThread != nullptr)
@@ -159,7 +152,7 @@ int CALLBACK wWinMain(
     _In_ PWSTR /*pwszCmdLine*/,
     _In_ int /*nCmdShow*/)
 {
-    Microsoft::Console::Interactivity::ServiceLocator::LocateGlobals().hInstance = hInstance;
+    ServiceLocator::LocateGlobals().hInstance = hInstance;
 
     ConsoleCheckDebug();
 
@@ -175,7 +168,7 @@ int CALLBACK wWinMain(
     HRESULT hr = args.ParseCommandline();
     if (SUCCEEDED(hr))
     {
-        if (ShouldUseLegacyConhost(args))
+        if (ShouldUseLegacyConhost(args.GetForceV1()))
         {
             if (args.ShouldCreateServerHandle())
             {

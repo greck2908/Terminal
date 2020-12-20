@@ -8,10 +8,10 @@
 
 #include "ApiSorter.h"
 
-#include "../host/globals.h"
-#include "../host/utils.hpp"
+#include "..\host\globals.h"
+#include "..\host\utils.hpp"
 
-#include "../interactivity/inc/ServiceLocator.hpp"
+#include "..\interactivity\inc\ServiceLocator.hpp"
 
 // Routine Description:
 // - Initializes a ConsoleWaitBlock
@@ -65,8 +65,9 @@ ConsoleWaitBlock::~ConsoleWaitBlock()
 // - pWaiter - The context/callback information to restore and dispatch the call later.
 // Return Value:
 // - S_OK if queued and ready to go. Appropriate HRESULT value if it failed.
-[[nodiscard]] HRESULT ConsoleWaitBlock::s_CreateWait(_Inout_ CONSOLE_API_MSG* const pWaitReplyMessage,
-                                                     _In_ IWaitRoutine* const pWaiter)
+[[nodiscard]]
+HRESULT ConsoleWaitBlock::s_CreateWait(_Inout_ CONSOLE_API_MSG* const pWaitReplyMessage,
+                                       _In_ IWaitRoutine* const pWaiter)
 {
     ConsoleProcessHandle* const ProcessData = pWaitReplyMessage->GetProcessHandle();
     FAIL_FAST_IF_NULL(ProcessData);
@@ -180,6 +181,7 @@ bool ConsoleWaitBlock::Notify(const WaitTerminationReason TerminationReason)
                 pRecordBuffer[i] = outEvents.front()->ToInputRecord();
                 outEvents.pop_front();
             }
+
         }
         else if (API_NUMBER_READCONSOLE == _WaitReplyMessage.msgHeader.ApiNumber)
         {
@@ -211,7 +213,7 @@ bool ConsoleWaitBlock::Notify(const WaitTerminationReason TerminationReason)
 
         LOG_IF_FAILED(_WaitReplyMessage.ReleaseMessageBuffers());
 
-        LOG_IF_FAILED(Microsoft::Console::Interactivity::ServiceLocator::LocateGlobals().pDeviceComm->CompleteIo(&_WaitReplyMessage.Complete));
+        LOG_IF_FAILED(ServiceLocator::LocateGlobals().pDeviceComm->CompleteIo(&_WaitReplyMessage.Complete));
 
         fRetVal = true;
     }

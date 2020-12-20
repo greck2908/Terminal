@@ -1,37 +1,68 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-
 #include "precomp.h"
 
-#include "screenInfoUiaProvider.hpp"
 #include "windowUiaProvider.hpp"
+#include "window.hpp"
 
-#include "../types/IUiaData.h"
-#include "../host/renderData.hpp"
+#include "screenInfoUiaProvider.hpp"
+#include "UiaTextRange.hpp"
+
 #include "../inc/ServiceLocator.hpp"
 
-using namespace Microsoft::Console::Types;
 using namespace Microsoft::Console::Interactivity::Win32;
+using namespace Microsoft::Console::Interactivity::Win32::WindowUiaProviderTracing;
 
-HRESULT WindowUiaProvider::RuntimeClassInitialize(_In_ IConsoleWindow* baseWindow) noexcept
-try
+WindowUiaProvider::WindowUiaProvider() :
+    _signalEventFiring{},
+    _pScreenInfoProvider{ nullptr },
+    _cRefs(1)
 {
-    _baseWindow = baseWindow;
 
-    Globals& g = ServiceLocator::LocateGlobals();
-    CONSOLE_INFORMATION& gci = g.getConsoleInformation();
-    IUiaData* uiaData = &gci.renderData;
-
-    RETURN_IF_FAILED(WRL::MakeAndInitialize<ScreenInfoUiaProvider>(&_pScreenInfoProvider, uiaData, this));
-
-    // TODO GitHub #1914: Re-attach Tracing to UIA Tree
-    //Tracing::s_TraceUia(pWindowProvider, ApiCall::Create, nullptr);
-
-    return S_OK;
 }
-CATCH_RETURN();
 
-[[nodiscard]] HRESULT WindowUiaProvider::Signal(_In_ EVENTID id)
+WindowUiaProvider::~WindowUiaProvider()
+{
+    if (_pScreenInfoProvider)
+    {
+        _pScreenInfoProvider->Release();
+    }
+}
+
+WindowUiaProvider* WindowUiaProvider::Create()
+{
+    WindowUiaProvider* pWindowProvider = nullptr;
+    ScreenInfoUiaProvider* pScreenInfoProvider = nullptr;
+    try
+    {
+        pWindowProvider = new WindowUiaProvider();
+        pScreenInfoProvider = new ScreenInfoUiaProvider(pWindowProvider);
+        pWindowProvider->_pScreenInfoProvider = pScreenInfoProvider;
+
+        Tracing::s_TraceUia(pWindowProvider, ApiCall::Create, nullptr);
+
+        return pWindowProvider;
+    }
+    catch (...)
+    {
+        if (nullptr != pWindowProvider)
+        {
+            pWindowProvider->Release();
+        }
+
+        if (nullptr != pScreenInfoProvider)
+        {
+            pScreenInfoProvider->Release();
+        }
+
+        LOG_CAUGHT_EXCEPTION();
+
+        return nullptr;
+    }
+}
+
+[[nodiscard]]
+HRESULT WindowUiaProvider::Signal(_In_ EVENTID id)
 {
     HRESULT hr = S_OK;
 
@@ -63,13 +94,20 @@ CATCH_RETURN();
     }
     CATCH_RETURN();
 
-    hr = UiaRaiseAutomationEvent(this, id);
+    IRawElementProviderSimple* pProvider = static_cast<IRawElementProviderSimple*>(this);
+    hr = UiaRaiseAutomationEvent(pProvider, id);
     _signalEventFiring[id] = false;
+
+    // tracing
+    ApiMessageSignal apiMsg;
+    apiMsg.Signal = id;
+    Tracing::s_TraceUia(this, ApiCall::Signal, &apiMsg);
 
     return hr;
 }
 
-[[nodiscard]] HRESULT WindowUiaProvider::SetTextAreaFocus()
+[[nodiscard]]
+HRESULT WindowUiaProvider::SetTextAreaFocus()
 {
     try
     {
@@ -78,13 +116,64 @@ CATCH_RETURN();
     CATCH_RETURN();
 }
 
+#pragma region IUnknown
+
+IFACEMETHODIMP_(ULONG) WindowUiaProvider::AddRef()
+{
+    Tracing::s_TraceUia(this, ApiCall::AddRef, nullptr);
+    return InterlockedIncrement(&_cRefs);
+}
+
+IFACEMETHODIMP_(ULONG) WindowUiaProvider::Release()
+{
+    Tracing::s_TraceUia(this, ApiCall::Release, nullptr);
+    long val = InterlockedDecrement(&_cRefs);
+    if (val == 0)
+    {
+        delete this;
+    }
+    return val;
+}
+
+IFACEMETHODIMP WindowUiaProvider::QueryInterface(_In_ REFIID riid, _COM_Outptr_result_maybenull_ void** ppInterface)
+{
+    Tracing::s_TraceUia(this, ApiCall::QueryInterface, nullptr);
+    if (riid == __uuidof(IUnknown))
+    {
+        *ppInterface = static_cast<IRawElementProviderSimple*>(this);
+    }
+    else if (riid == __uuidof(IRawElementProviderSimple))
+    {
+        *ppInterface = static_cast<IRawElementProviderSimple*>(this);
+    }
+    else if (riid == __uuidof(IRawElementProviderFragment))
+    {
+        *ppInterface = static_cast<IRawElementProviderFragment*>(this);
+    }
+    else if (riid == __uuidof(IRawElementProviderFragmentRoot))
+    {
+        *ppInterface = static_cast<IRawElementProviderFragmentRoot*>(this);
+    }
+    else
+    {
+        *ppInterface = nullptr;
+        return E_NOINTERFACE;
+    }
+
+    (static_cast<IUnknown*>(*ppInterface))->AddRef();
+
+    return S_OK;
+}
+
+#pragma endregion
+
 #pragma region IRawElementProviderSimple
 
 // Implementation of IRawElementProviderSimple::get_ProviderOptions.
 // Gets UI Automation provider options.
 IFACEMETHODIMP WindowUiaProvider::get_ProviderOptions(_Out_ ProviderOptions* pOptions)
 {
-    RETURN_HR_IF_NULL(E_INVALIDARG, pOptions);
+    Tracing::s_TraceUia(this, ApiCall::GetProviderOptions, nullptr);
     RETURN_IF_FAILED(_EnsureValidHwnd());
 
     *pOptions = ProviderOptions_ServerSideProvider;
@@ -96,7 +185,7 @@ IFACEMETHODIMP WindowUiaProvider::get_ProviderOptions(_Out_ ProviderOptions* pOp
 IFACEMETHODIMP WindowUiaProvider::GetPatternProvider(_In_ PATTERNID /*patternId*/,
                                                      _COM_Outptr_result_maybenull_ IUnknown** ppInterface)
 {
-    RETURN_HR_IF_NULL(E_INVALIDARG, ppInterface);
+    Tracing::s_TraceUia(this, ApiCall::GetPatternProvider, nullptr);
     *ppInterface = nullptr;
     RETURN_IF_FAILED(_EnsureValidHwnd());
 
@@ -107,7 +196,7 @@ IFACEMETHODIMP WindowUiaProvider::GetPatternProvider(_In_ PATTERNID /*patternId*
 // Gets custom properties.
 IFACEMETHODIMP WindowUiaProvider::GetPropertyValue(_In_ PROPERTYID propertyId, _Out_ VARIANT* pVariant)
 {
-    RETURN_HR_IF_NULL(E_INVALIDARG, pVariant);
+    Tracing::s_TraceUia(this, ApiCall::GetPropertyValue, nullptr);
     RETURN_IF_FAILED(_EnsureValidHwnd());
 
     pVariant->vt = VT_EMPTY;
@@ -121,7 +210,7 @@ IFACEMETHODIMP WindowUiaProvider::GetPropertyValue(_In_ PROPERTYID propertyId, _
     }
     else if (propertyId == UIA_AutomationIdPropertyId)
     {
-        pVariant->bstrVal = SysAllocString(AutomationIdPropertyName);
+        pVariant->bstrVal = SysAllocString(L"Console Window");
         if (pVariant->bstrVal != nullptr)
         {
             pVariant->vt = VT_BSTR;
@@ -149,7 +238,7 @@ IFACEMETHODIMP WindowUiaProvider::GetPropertyValue(_In_ PROPERTYID propertyId, _
     }
     else if (propertyId == UIA_ProviderDescriptionPropertyId)
     {
-        pVariant->bstrVal = SysAllocString(ProviderDescriptionPropertyName);
+        pVariant->bstrVal = SysAllocString(L"Microsoft Console Host Window");
         if (pVariant->bstrVal != nullptr)
         {
             pVariant->vt = VT_BSTR;
@@ -164,15 +253,15 @@ IFACEMETHODIMP WindowUiaProvider::GetPropertyValue(_In_ PROPERTYID propertyId, _
 // supplies many properties.
 IFACEMETHODIMP WindowUiaProvider::get_HostRawElementProvider(_COM_Outptr_result_maybenull_ IRawElementProviderSimple** ppProvider)
 {
-    RETURN_HR_IF_NULL(E_INVALIDARG, ppProvider);
+    Tracing::s_TraceUia(this, ApiCall::GetHostRawElementProvider, nullptr);
     try
     {
-        const HWND hwnd = GetWindowHandle();
+        const HWND hwnd = _GetWindowHandle();
         return UiaHostProviderFromHwnd(hwnd, ppProvider);
     }
-    catch (...)
+    catch(...)
     {
-        return gsl::narrow_cast<HRESULT>(UIA_E_ELEMENTNOTAVAILABLE);
+        return static_cast<HRESULT>(UIA_E_ELEMENTNOTAVAILABLE);
     }
 }
 #pragma endregion
@@ -181,13 +270,18 @@ IFACEMETHODIMP WindowUiaProvider::get_HostRawElementProvider(_COM_Outptr_result_
 
 IFACEMETHODIMP WindowUiaProvider::Navigate(_In_ NavigateDirection direction, _COM_Outptr_result_maybenull_ IRawElementProviderFragment** ppProvider)
 {
+    ApiMsgNavigate apiMsg;
+    apiMsg.Direction = direction;
+    Tracing::s_TraceUia(this, ApiCall::Navigate, &apiMsg);
+
     RETURN_IF_FAILED(_EnsureValidHwnd());
     *ppProvider = nullptr;
     HRESULT hr = S_OK;
 
     if (direction == NavigateDirection_FirstChild || direction == NavigateDirection_LastChild)
     {
-        RETURN_IF_FAILED(_pScreenInfoProvider.CopyTo(ppProvider));
+        *ppProvider = _pScreenInfoProvider;
+        (*ppProvider)->AddRef();
 
         // signal that the focus changed
         LOG_IF_FAILED(_pScreenInfoProvider->Signal(UIA_AutomationFocusChangedEventId));
@@ -199,7 +293,7 @@ IFACEMETHODIMP WindowUiaProvider::Navigate(_In_ NavigateDirection direction, _CO
 
 IFACEMETHODIMP WindowUiaProvider::GetRuntimeId(_Outptr_result_maybenull_ SAFEARRAY** ppRuntimeId)
 {
-    RETURN_HR_IF_NULL(E_INVALIDARG, ppRuntimeId);
+    Tracing::s_TraceUia(this, ApiCall::GetRuntimeId, nullptr);
     RETURN_IF_FAILED(_EnsureValidHwnd());
     // Root defers this to host, others must implement it...
     *ppRuntimeId = nullptr;
@@ -209,29 +303,25 @@ IFACEMETHODIMP WindowUiaProvider::GetRuntimeId(_Outptr_result_maybenull_ SAFEARR
 
 IFACEMETHODIMP WindowUiaProvider::get_BoundingRectangle(_Out_ UiaRect* pRect)
 {
-    RETURN_HR_IF_NULL(E_INVALIDARG, pRect);
+    Tracing::s_TraceUia(this, ApiCall::GetBoundingRectangle, nullptr);
     RETURN_IF_FAILED(_EnsureValidHwnd());
 
-    RETURN_HR_IF_NULL((HRESULT)UIA_E_ELEMENTNOTAVAILABLE, _baseWindow);
+    const IConsoleWindow* const pIConsoleWindow = _getIConsoleWindow();
+    RETURN_HR_IF_NULL((HRESULT)UIA_E_ELEMENTNOTAVAILABLE, pIConsoleWindow);
 
-    RECT const rc = _baseWindow->GetWindowRect();
+    RECT const rc = pIConsoleWindow->GetWindowRect();
 
     pRect->left = rc.left;
     pRect->top = rc.top;
-
-    LONG longWidth = 0;
-    RETURN_IF_FAILED(LongSub(rc.right, rc.left, &longWidth));
-    pRect->width = longWidth;
-    LONG longHeight = 0;
-    RETURN_IF_FAILED(LongSub(rc.bottom, rc.top, &longHeight));
-    pRect->height = longHeight;
+    pRect->width = rc.right - rc.left;
+    pRect->height = rc.bottom - rc.top;
 
     return S_OK;
 }
 
 IFACEMETHODIMP WindowUiaProvider::GetEmbeddedFragmentRoots(_Outptr_result_maybenull_ SAFEARRAY** ppRoots)
 {
-    RETURN_HR_IF_NULL(E_INVALIDARG, ppRoots);
+    Tracing::s_TraceUia(this, ApiCall::GetEmbeddedFragmentRoots, nullptr);
     RETURN_IF_FAILED(_EnsureValidHwnd());
 
     *ppRoots = nullptr;
@@ -240,16 +330,18 @@ IFACEMETHODIMP WindowUiaProvider::GetEmbeddedFragmentRoots(_Outptr_result_mayben
 
 IFACEMETHODIMP WindowUiaProvider::SetFocus()
 {
+    Tracing::s_TraceUia(this, ApiCall::SetFocus, nullptr);
     RETURN_IF_FAILED(_EnsureValidHwnd());
     return Signal(UIA_AutomationFocusChangedEventId);
 }
 
 IFACEMETHODIMP WindowUiaProvider::get_FragmentRoot(_COM_Outptr_result_maybenull_ IRawElementProviderFragmentRoot** ppProvider)
 {
-    RETURN_HR_IF_NULL(E_INVALIDARG, ppProvider);
+    Tracing::s_TraceUia(this, ApiCall::GetFragmentRoot, nullptr);
     RETURN_IF_FAILED(_EnsureValidHwnd());
 
-    RETURN_IF_FAILED(QueryInterface(IID_PPV_ARGS(ppProvider)));
+    *ppProvider = this;
+    AddRef();
     return S_OK;
 }
 
@@ -261,50 +353,45 @@ IFACEMETHODIMP WindowUiaProvider::ElementProviderFromPoint(_In_ double /*x*/,
                                                            _In_ double /*y*/,
                                                            _COM_Outptr_result_maybenull_ IRawElementProviderFragment** ppProvider)
 {
+    Tracing::s_TraceUia(this, ApiCall::ElementProviderFromPoint, nullptr);
     RETURN_IF_FAILED(_EnsureValidHwnd());
 
-    RETURN_IF_FAILED(_pScreenInfoProvider.CopyTo(ppProvider));
+    *ppProvider = _pScreenInfoProvider;
+    (*ppProvider)->AddRef();
 
     return S_OK;
 }
 
 IFACEMETHODIMP WindowUiaProvider::GetFocus(_COM_Outptr_result_maybenull_ IRawElementProviderFragment** ppProvider)
 {
+    Tracing::s_TraceUia(this, ApiCall::GetFocus, nullptr);
     RETURN_IF_FAILED(_EnsureValidHwnd());
     return _pScreenInfoProvider->QueryInterface(IID_PPV_ARGS(ppProvider));
 }
 
 #pragma endregion
 
-HWND WindowUiaProvider::GetWindowHandle() const
+HWND WindowUiaProvider::_GetWindowHandle() const
 {
-    if (_baseWindow)
-    {
-        return _baseWindow->GetWindowHandle();
-    }
-    else
-    {
-        return nullptr;
-    }
+    IConsoleWindow* const pIConsoleWindow = _getIConsoleWindow();
+    THROW_HR_IF_NULL(E_POINTER, pIConsoleWindow);
+
+    return pIConsoleWindow->GetWindowHandle();
 }
 
-[[nodiscard]] HRESULT WindowUiaProvider::_EnsureValidHwnd() const
+[[nodiscard]]
+HRESULT WindowUiaProvider::_EnsureValidHwnd() const
 {
     try
     {
-        HWND const hwnd = GetWindowHandle();
+        HWND const hwnd = _GetWindowHandle();
         RETURN_HR_IF((HRESULT)UIA_E_ELEMENTNOTAVAILABLE, !(IsWindow(hwnd)));
     }
     CATCH_RETURN();
     return S_OK;
 }
 
-void WindowUiaProvider::ChangeViewport(const SMALL_RECT NewWindow)
+IConsoleWindow* const WindowUiaProvider::_getIConsoleWindow()
 {
-    _baseWindow->ChangeViewport(NewWindow);
-}
-
-RECT WindowUiaProvider::GetWindowRect() const noexcept
-{
-    return _baseWindow->GetWindowRect();
+    return ServiceLocator::LocateConsoleWindow();
 }

@@ -30,7 +30,7 @@
     <ClCompile Include="TfDispAttr.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="TfEditSession.cpp">
+    <ClCompile Include="TfEditses.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="TfTxtevCb.cpp">
@@ -53,6 +53,9 @@
     <ClInclude Include="precomp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="StructureArray.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="TfCatUtil.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -65,7 +68,7 @@
     <ClInclude Include="TfDispAttr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="TfEditSession.h">
+    <ClInclude Include="TfEditses.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

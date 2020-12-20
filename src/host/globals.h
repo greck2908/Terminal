@@ -22,17 +22,18 @@ Revision History:
 #include "ConsoleArguments.hpp"
 #include "ApiRoutines.h"
 
-#include "../renderer/inc/IRenderData.hpp"
-#include "../renderer/inc/IRenderEngine.hpp"
-#include "../renderer/inc/IRenderer.hpp"
-#include "../renderer/inc/IFontDefaultList.hpp"
+#include "..\renderer\inc\IRenderData.hpp"
+#include "..\renderer\inc\IRenderEngine.hpp"
+#include "..\renderer\inc\IRenderer.hpp"
+#include "..\renderer\inc\IFontDefaultList.hpp"
 
-#include "../server/DeviceComm.h"
-#include "../server/ConDrvDeviceComm.h"
+#include "..\server\DeviceComm.h"
 
 #include <TraceLoggingProvider.h>
 #include <winmeta.h>
 TRACELOGGING_DECLARE_PROVIDER(g_hConhostV2EventTraceProvider);
+
+using namespace Microsoft::Console::Render;
 
 class Globals
 {
@@ -46,7 +47,7 @@ public:
 
     CONSOLE_INFORMATION& getConsoleInformation();
 
-    IDeviceComm* pDeviceComm;
+    DeviceComm* pDeviceComm;
 
     wil::unique_event_nothrow hInputEvent;
 
@@ -62,17 +63,13 @@ public:
 
     std::vector<wchar_t> WordDelimiters;
 
-    Microsoft::Console::Render::IRenderer* pRender;
+    IRenderer* pRender;
 
-    Microsoft::Console::Render::IFontDefaultList* pFontDefaultList;
+    IFontDefaultList* pFontDefaultList;
 
     bool IsHeadless() const;
 
     ApiRoutines api;
-
-#ifdef UNIT_TESTING
-    void EnableConptyModeForTests(std::unique_ptr<Microsoft::Console::Render::VtEngine> vtRenderEngine);
-#endif
 
 private:
     CONSOLE_INFORMATION ciConsoleInformation;

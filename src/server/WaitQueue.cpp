@@ -6,14 +6,15 @@
 #include "WaitQueue.h"
 #include "WaitBlock.h"
 
-#include "../host/globals.h"
-#include "../host/utils.hpp"
+#include "..\host\globals.h"
+#include "..\host\utils.hpp"
 
 // Routine Description:
 // - Instantiates a new ConsoleWaitQueue
 ConsoleWaitQueue::ConsoleWaitQueue() :
     _blocks()
 {
+
 }
 
 // Routine Description:
@@ -32,8 +33,9 @@ ConsoleWaitQueue::~ConsoleWaitQueue()
 // - pWaiter - The context/callback information to restore and dispatch the call later.
 // Return Value:
 // - S_OK if enqueued appropriately and everything is alright. Or suitable HRESULT failure otherwise.
-[[nodiscard]] HRESULT ConsoleWaitQueue::s_CreateWait(_Inout_ CONSOLE_API_MSG* const pWaitReplyMessage,
-                                                     _In_ IWaitRoutine* const pWaiter)
+[[nodiscard]]
+HRESULT ConsoleWaitQueue::s_CreateWait(_Inout_ CONSOLE_API_MSG* const pWaitReplyMessage,
+                                       _In_ IWaitRoutine* const pWaiter)
 {
     // Normally we'd have the Wait Queue handle the insertion of the block into the queue, but
     // the console does queues in a somewhat special way.

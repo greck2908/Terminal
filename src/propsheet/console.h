@@ -26,20 +26,19 @@ Revision History:
 #include "OptionsPage.h"
 #include "LayoutPage.h"
 #include "ColorsPage.h"
-#include "TerminalPropsheetPage.h"
+#include "TerminalPage.h"
 #include "ColorControl.h"
 
 //
 // Icon ID.
 //
 
-#define IDI_CONSOLE 1
+#define IDI_CONSOLE                   1
 
 //
 // String table constants
 //
 
-// clang-format off
 #define IDS_NAME                      1
 #define IDS_INFO                      2
 #define IDS_TITLE                     3
@@ -58,51 +57,86 @@ Revision History:
 // unused 16
 #define IDS_TOOLTIP_OPACITY          17
 #define IDS_TOOLTIP_INTERCEPT_COPY_PASTE    18
-// clang-format on
 
-void MakeAltRasterFont(
+NTSTATUS
+MakeAltRasterFont(
     __in UINT CodePage,
-    __out COORD* AltFontSize,
-    __out BYTE* AltFontFamily,
-    __out ULONG* AltFontIndex,
+    __out COORD *AltFontSize,
+    __out BYTE  *AltFontFamily,
+    __out ULONG *AltFontIndex,
     __out_ecount(LF_FACESIZE) LPTSTR AltFaceName);
 
-[[nodiscard]] NTSTATUS InitializeDbcsMisc(VOID);
+NTSTATUS InitializeDbcsMisc();
 
-BYTE CodePageToCharSet(
-    UINT CodePage);
+BYTE
+CodePageToCharSet(
+    UINT CodePage
+    );
 
-BOOL ShouldAllowAllMonoTTFonts();
+BOOL
+ShouldAllowAllMonoTTFonts();
 
 LPTTFONTLIST
 SearchTTFont(
     __in_opt LPCTSTR ptszFace,
-    BOOL fCodePage,
-    UINT CodePage);
+    BOOL   fCodePage,
+    UINT   CodePage
+    );
 
-BOOL IsAvailableTTFont(
-    LPCTSTR ptszFace);
+BOOL
+IsAvailableTTFont(
+    LPCTSTR ptszFace
+    );
 
-BOOL IsAvailableTTFontCP(
-    LPCTSTR ptszFace,
-    UINT CodePage);
+BOOL
+IsAvailableTTFontCP(
+    LPCWSTR pwszFace,
+    UINT CodePage
+    );
 
-BOOL IsDisableBoldTTFont(
-    LPCTSTR ptszFace);
+BOOL
+IsDisableBoldTTFont(
+    LPCTSTR ptszFace
+    );
 
 LPTSTR
 GetAltFaceName(
-    LPCTSTR ptszFace);
+    LPCTSTR ptszFace
+    );
 
-[[nodiscard]] NTSTATUS DestroyDbcsMisc(VOID);
+NTSTATUS DestroyDbcsMisc();
 
-int LanguageListCreate(
+int
+LanguageListCreate(
     HWND hDlg,
-    UINT CodePage);
+    UINT CodePage
+    );
 
-int LanguageDisplay(
+int
+LanguageDisplay(
     HWND hDlg,
-    UINT CodePage);
+    UINT CodePage
+    ) ;
+
+//
+// registry.c
+//
+NTSTATUS
+MyRegOpenKey(
+    __in_opt HANDLE hKey,
+    __in LPCWSTR lpSubKey,
+    __out PHANDLE phResult
+    );
+
+NTSTATUS
+MyRegEnumValue(
+    __in HANDLE hKey,
+    __in DWORD dwIndex,
+    __in DWORD dwValueLength,
+    __out_bcount(dwValueLength) LPWSTR lpValueName,
+    __in_range(4, 1024) DWORD dwDataLength,
+    __out_bcount(dwDataLength) LPBYTE lpData
+    );
 
 //
 // Function prototypes
@@ -136,13 +170,16 @@ VOID SetRegistryValues(
     PCONSOLE_STATE_INFO StateInfo,
     DWORD dwPage);
 
-[[nodiscard]] LRESULT CALLBACK FontPreviewWndProc(
+PCONSOLE_STATE_INFO InitStateValues(
+    HWND hwnd);
+
+LRESULT FontPreviewWndProc(
     HWND hWnd,
     UINT wMsg,
     WPARAM wParam,
     LPARAM lParam);
 
-[[nodiscard]] LRESULT CALLBACK PreviewWndProc(
+LRESULT PreviewWndProc(
     HWND hWnd,
     UINT wMsg,
     WPARAM wParam,
@@ -160,9 +197,9 @@ BOOL UpdateStateInfo(
 BOOL InitializeConsoleState();
 void UninitializeConsoleState();
 void UpdateApplyButton(const HWND hDlg);
-[[nodiscard]] HRESULT FindFontAndUpdateState();
+HRESULT FindFontAndUpdateState();
 
-BOOL PopulatePropSheetPageArray(_Out_writes_(cPsps) PROPSHEETPAGE* pPsp, const size_t cPsps, const BOOL fRegisterCallbacks);
+BOOL PopulatePropSheetPageArray(_Out_writes_(cPsps) PROPSHEETPAGE *pPsp, const size_t cPsps, const BOOL fRegisterCallbacks);
 
 void CreateAndAssociateToolTipToControl(const UINT dlgItem, const HWND hDlg, const UINT idsToolTip);
 
@@ -173,17 +210,16 @@ void Undo(HWND hControlWindow);
 //
 // Macros
 //
-#define AttrToRGB(Attr) (gpStateInfo->ColorTable[(Attr)&0x0F])
+#define AttrToRGB(Attr) (gpStateInfo->ColorTable[(Attr) & 0x0F])
 #define ScreenTextColor(pStateInfo) \
-    (AttrToRGB(LOBYTE(pStateInfo->ScreenAttributes) & 0x0F))
+            (AttrToRGB(LOBYTE(pStateInfo->ScreenAttributes) & 0x0F))
 #define ScreenBkColor(pStateInfo) \
-    (AttrToRGB(LOBYTE(pStateInfo->ScreenAttributes >> 4)))
+            (AttrToRGB(LOBYTE(pStateInfo->ScreenAttributes >> 4)))
 #define PopupTextColor(pStateInfo) \
-    (AttrToRGB(LOBYTE(pStateInfo->PopupAttributes) & 0x0F))
+            (AttrToRGB(LOBYTE(pStateInfo->PopupAttributes) & 0x0F))
 #define PopupBkColor(pStateInfo) \
-    (AttrToRGB(LOBYTE(pStateInfo->PopupAttributes >> 4)))
+            (AttrToRGB(LOBYTE(pStateInfo->PopupAttributes >> 4)))
 
-// clang-format off
 #if DBG
   #define _DBGFONTS  0x00000001
   #define _DBGFONTS2 0x00000002
@@ -202,18 +238,17 @@ void Undo(HWND hControlWindow);
   #define DBGCHARS(_params_)
   #define DBGOUTPUT(_params_)
 #endif
-// clang-format on
 
 // Macro definitions that handle codepages
 //
-#define CP_US (UINT)437
-#define CP_JPN (UINT)932
-#define CP_WANSUNG (UINT)949
-#define CP_TC (UINT)950
-#define CP_SC (UINT)936
+#define CP_US       (UINT)437
+#define CP_JPN      (UINT)932
+#define CP_WANSUNG  (UINT)949
+#define CP_TC       (UINT)950
+#define CP_SC       (UINT)936
 
-#define IsBilingualCP(cp) ((cp) == CP_JPN || (cp) == CP_WANSUNG)
-#define IsEastAsianCP(cp) ((cp) == CP_JPN || (cp) == CP_WANSUNG || (cp) == CP_TC || (cp) == CP_SC)
+#define IsBilingualCP(cp) ((cp)==CP_JPN || (cp)==CP_WANSUNG)
+#define IsEastAsianCP(cp) ((cp)==CP_JPN || (cp)==CP_WANSUNG || (cp)==CP_TC || (cp)==CP_SC)
 
 const unsigned int TRANSPARENCY_RANGE_MIN = 0x4D;
 
@@ -225,5 +260,3 @@ const unsigned int TERMINAL_PAGE_INDEX = 4;
 // number of property sheet pages
 static const int V1_NUMBER_OF_PAGES = 4;
 static const int NUMBER_OF_PAGES = 5;
-
-BOOL GetConsoleBoolValue(__in PCWSTR pszValueName, __in BOOL fDefault);

@@ -3,16 +3,15 @@
 
 #include "precomp.h"
 #include "WexTestClass.h"
-#include "../../inc/consoletaeftemplates.hpp"
+#include "..\..\inc\consoletaeftemplates.hpp"
 
 #include "CommonState.hpp"
 
-#include "../buffer/out/search.h"
+#include "search.h"
 
 using namespace WEX::Common;
 using namespace WEX::Logging;
 using namespace WEX::TestExecution;
-using Microsoft::Console::Interactivity::ServiceLocator;
 
 class SearchTests
 {
@@ -87,73 +86,81 @@ class SearchTests
 
     TEST_METHOD(ForwardCaseSensitive)
     {
-        auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& outputBuffer = gci.GetActiveOutputBuffer();
 
         COORD coordStartExpected = { 0 };
-        Search s(gci.renderData, L"AB", Search::Direction::Forward, Search::Sensitivity::CaseSensitive);
+        Search s(outputBuffer, L"AB", Search::Direction::Forward, Search::Sensitivity::CaseSensitive);
         DoFoundChecks(s, coordStartExpected, 1);
     }
 
     TEST_METHOD(ForwardCaseSensitiveJapanese)
     {
-        auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& outputBuffer = gci.GetActiveOutputBuffer();
 
         COORD coordStartExpected = { 2, 0 };
-        Search s(gci.renderData, L"\x304b", Search::Direction::Forward, Search::Sensitivity::CaseSensitive);
+        Search s(outputBuffer, L"\x304b", Search::Direction::Forward, Search::Sensitivity::CaseSensitive);
         DoFoundChecks(s, coordStartExpected, 1);
     }
 
     TEST_METHOD(ForwardCaseInsensitive)
     {
-        auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& outputBuffer = gci.GetActiveOutputBuffer();
 
         COORD coordStartExpected = { 0 };
-        Search s(gci.renderData, L"ab", Search::Direction::Forward, Search::Sensitivity::CaseInsensitive);
+        Search s(outputBuffer, L"ab", Search::Direction::Forward, Search::Sensitivity::CaseInsensitive);
         DoFoundChecks(s, coordStartExpected, 1);
     }
 
     TEST_METHOD(ForwardCaseInsensitiveJapanese)
     {
-        auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& outputBuffer = gci.GetActiveOutputBuffer();
 
         COORD coordStartExpected = { 2, 0 };
-        Search s(gci.renderData, L"\x304b", Search::Direction::Forward, Search::Sensitivity::CaseInsensitive);
+        Search s(outputBuffer, L"\x304b", Search::Direction::Forward, Search::Sensitivity::CaseInsensitive);
         DoFoundChecks(s, coordStartExpected, 1);
     }
 
     TEST_METHOD(BackwardCaseSensitive)
     {
-        auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& outputBuffer = gci.GetActiveOutputBuffer();
 
         COORD coordStartExpected = { 0, 3 };
-        Search s(gci.renderData, L"AB", Search::Direction::Backward, Search::Sensitivity::CaseSensitive);
+        Search s(outputBuffer, L"AB", Search::Direction::Backward, Search::Sensitivity::CaseSensitive);
         DoFoundChecks(s, coordStartExpected, -1);
     }
 
     TEST_METHOD(BackwardCaseSensitiveJapanese)
     {
-        auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& outputBuffer = gci.GetActiveOutputBuffer();
 
         COORD coordStartExpected = { 2, 3 };
-        Search s(gci.renderData, L"\x304b", Search::Direction::Backward, Search::Sensitivity::CaseSensitive);
+        Search s(outputBuffer, L"\x304b", Search::Direction::Backward, Search::Sensitivity::CaseSensitive);
         DoFoundChecks(s, coordStartExpected, -1);
     }
 
     TEST_METHOD(BackwardCaseInsensitive)
     {
-        auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& outputBuffer = gci.GetActiveOutputBuffer();
 
         COORD coordStartExpected = { 0, 3 };
-        Search s(gci.renderData, L"ab", Search::Direction::Backward, Search::Sensitivity::CaseInsensitive);
+        Search s(outputBuffer, L"ab", Search::Direction::Backward, Search::Sensitivity::CaseInsensitive);
         DoFoundChecks(s, coordStartExpected, -1);
     }
 
     TEST_METHOD(BackwardCaseInsensitiveJapanese)
     {
-        auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
+        const auto& outputBuffer = gci.GetActiveOutputBuffer();
 
         COORD coordStartExpected = { 2, 3 };
-        Search s(gci.renderData, L"\x304b", Search::Direction::Backward, Search::Sensitivity::CaseInsensitive);
+        Search s(outputBuffer, L"\x304b", Search::Direction::Backward, Search::Sensitivity::CaseInsensitive);
         DoFoundChecks(s, coordStartExpected, -1);
     }
 };

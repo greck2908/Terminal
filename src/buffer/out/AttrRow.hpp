@@ -20,7 +20,6 @@ Revision History:
 
 #pragma once
 
-#include "boost/container/small_vector.hpp"
 #include "TextAttributeRun.hpp"
 #include "AttrRowIterator.hpp"
 
@@ -29,16 +28,7 @@ class ATTR_ROW final
 public:
     using const_iterator = typename AttrRowIterator;
 
-    ATTR_ROW(const UINT cchRowWidth, const TextAttribute attr)
-    noexcept;
-
-    ~ATTR_ROW() = default;
-
-    ATTR_ROW(const ATTR_ROW&) = default;
-    ATTR_ROW& operator=(const ATTR_ROW&) = default;
-    ATTR_ROW(ATTR_ROW&&)
-    noexcept = default;
-    ATTR_ROW& operator=(ATTR_ROW&&) noexcept = default;
+    ATTR_ROW(const UINT cchRowWidth, const TextAttribute attr);
 
     void Reset(const TextAttribute attr);
 
@@ -51,17 +41,17 @@ public:
     size_t FindAttrIndex(const size_t index,
                          size_t* const pApplies) const;
 
-    std::unordered_set<uint16_t> GetHyperlinks();
-
     bool SetAttrToEnd(const UINT iStart, const TextAttribute attr);
+    void ReplaceLegacyAttrs(const WORD wToBeReplacedAttr, const WORD wReplaceWith) noexcept;
     void ReplaceAttrs(const TextAttribute& toBeReplacedAttr, const TextAttribute& replaceWith) noexcept;
 
     void Resize(const size_t newWidth);
 
-    [[nodiscard]] HRESULT InsertAttrRuns(const gsl::span<const TextAttributeRun> newAttrs,
-                                         const size_t iStart,
-                                         const size_t iEnd,
-                                         const size_t cBufferWidth);
+    [[nodiscard]]
+    HRESULT InsertAttrRuns(const std::basic_string_view<TextAttributeRun> newAttrs,
+                           const size_t iStart,
+                           const size_t iEnd,
+                           const size_t cBufferWidth);
 
     static std::vector<TextAttributeRun> PackAttrs(const std::vector<TextAttribute>& attrs);
 
@@ -75,10 +65,12 @@ public:
     friend class AttrRowIterator;
 
 private:
-    boost::container::small_vector<TextAttributeRun, 1> _list;
+
+    std::vector<TextAttributeRun> _list;
     size_t _cchRowWidth;
 
 #ifdef UNIT_TESTING
     friend class AttrRowTests;
 #endif
+
 };

@@ -10,6 +10,13 @@
 class CursorTests
 {
     BEGIN_TEST_CLASS(CursorTests)
+        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"conhost.exe")
+        TEST_CLASS_PROPERTY(L"ArtifactUnderTest", L"wincon.h")
+        TEST_CLASS_PROPERTY(L"ArtifactUnderTest", L"winconp.h")
+        TEST_CLASS_PROPERTY(L"ArtifactUnderTest", L"wincontypes.h")
+        TEST_CLASS_PROPERTY(L"ArtifactUnderTest", L"conmsgl1.h")
+        TEST_CLASS_PROPERTY(L"ArtifactUnderTest", L"conmsgl2.h")
+        TEST_CLASS_PROPERTY(L"ArtifactUnderTest", L"conmsgl3.h")
     END_TEST_CLASS()
 
     TEST_METHOD_SETUP(TestSetup);
@@ -39,7 +46,6 @@ bool CursorTests::TestCleanup()
 
 void CursorTests::TestGetSetConsoleCursorInfo()
 {
-    using namespace WEX::TestExecution;
     DWORD dwSize;
     bool bVisible;
 
@@ -154,6 +160,6 @@ void CursorTests::TestSetConsoleCursorPosition()
     // Try several cases
     TestSetConsoleCursorPositionImpl(0, 0, TRUE); // Top left corner of buffer
     TestSetConsoleCursorPositionImpl(sbiInitial.dwSize.X - 1, sbiInitial.dwSize.Y - 1, TRUE); // Bottom right corner of buffer
-    TestSetConsoleCursorPositionImpl(sbiInitial.dwSize.X, sbiInitial.dwSize.Y, FALSE); // 1 beyond bottom right corner (the size is 1 larger than the array indices)
+    TestSetConsoleCursorPositionImpl(sbiInitial.dwSize.X, sbiInitial.dwSize.Y, FALSE); // 1 beyond bottom right corner (the size is 1 larger than the array indicies)
     TestSetConsoleCursorPositionImpl(MAXWORD, MAXWORD, FALSE); // Max values
 }

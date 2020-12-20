@@ -10,10 +10,10 @@
 
 #include "ApiSorter.h"
 
-#include "../host/globals.h"
+#include "..\host\globals.h"
 
-#include "../host/getset.h"
-#include "../host/stream.h"
+#include "..\host\getset.h"
+#include "..\host\stream.h"
 
 void IoSorter::ServiceIoOperation(_In_ CONSOLE_API_MSG* const pMsg,
                                   _Out_ CONSOLE_API_MSG** ReplyMsg)
@@ -58,6 +58,7 @@ void IoSorter::ServiceIoOperation(_In_ CONSOLE_API_MSG* const pMsg,
         if (ReplyPending)
         {
             *ReplyMsg = nullptr;
+
         }
         else
         {
@@ -76,6 +77,7 @@ void IoSorter::ServiceIoOperation(_In_ CONSOLE_API_MSG* const pMsg,
         if (ReplyPending)
         {
             *ReplyMsg = nullptr;
+
         }
         else
         {
@@ -86,7 +88,7 @@ void IoSorter::ServiceIoOperation(_In_ CONSOLE_API_MSG* const pMsg,
 
     case CONSOLE_IO_RAW_FLUSH:
         ReplyPending = FALSE;
-
+        
         Status = NTSTATUS_FROM_HRESULT(ApiDispatchers::ServerFlushConsoleInputBuffer(pMsg, &ReplyPending));
         FAIL_FAST_IF(!(!ReplyPending));
         pMsg->SetReplyStatus(Status);

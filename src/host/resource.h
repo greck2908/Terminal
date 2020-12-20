@@ -15,8 +15,6 @@ Author(s):
 
 #pragma once
 
-// clang-format off
-
 // Fusion Application Manifest
 #define IDR_SYSTEM_MANIFEST 100
 
@@ -50,5 +48,3 @@ Author(s):
 #define ID_CONSOLE_FINDCASE     602
 #define ID_CONSOLE_FINDUP       603
 #define ID_CONSOLE_FINDDOWN     604
-
-// clang-format on

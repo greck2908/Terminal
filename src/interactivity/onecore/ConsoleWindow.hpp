@@ -14,15 +14,16 @@ Author(s):
 
 #pragma once
 
-#include "../inc/IConsoleWindow.hpp"
+#include "..\inc\IConsoleWindow.hpp"
 
 #pragma hdrstop
 
 namespace Microsoft::Console::Interactivity::OneCore
 {
-    class ConsoleWindow sealed : public Microsoft::Console::Types::IConsoleWindow
+    class ConsoleWindow sealed : public IConsoleWindow
     {
     public:
+
         // Inherited via IConsoleWindow
         BOOL EnableBothScrollBars();
         int UpdateScrollBar(bool isVertical, bool isAltBuffer, UINT pageSize, int maxSize, int viewportPosition);
@@ -55,8 +56,10 @@ namespace Microsoft::Console::Interactivity::OneCore
         void HorizontalScroll(const WORD wScrollCommand, const WORD wAbsoluteChange);
         void VerticalScroll(const WORD wScrollCommand, const WORD wAbsoluteChange);
 
-        [[nodiscard]] HRESULT SignalUia(_In_ EVENTID id);
-        [[nodiscard]] HRESULT UiaSetTextAreaFocus();
-        RECT GetWindowRect() const noexcept;
+        [[nodiscard]]
+        HRESULT SignalUia(_In_ EVENTID id);
+        [[nodiscard]]
+        HRESULT UiaSetTextAreaFocus();
+        RECT GetWindowRect() const;
     };
 }

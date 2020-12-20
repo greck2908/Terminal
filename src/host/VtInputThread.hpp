@@ -14,7 +14,8 @@ Author(s):
 --*/
 #pragma once
 
-#include "../terminal/parser/StateMachine.hpp"
+#include "..\terminal\parser\StateMachine.hpp"
+#include "utf8ToWideCharParser.hpp"
 
 namespace Microsoft::Console
 {
@@ -23,12 +24,14 @@ namespace Microsoft::Console
     public:
         VtInputThread(_In_ wil::unique_hfile hPipe, const bool inheritCursor);
 
-        [[nodiscard]] HRESULT Start();
-        static DWORD WINAPI StaticVtInputThreadProc(_In_ LPVOID lpParameter);
+        [[nodiscard]]
+        HRESULT Start();
+        static DWORD StaticVtInputThreadProc(_In_ LPVOID lpParameter);
         void DoReadInput(const bool throwOnFail);
 
     private:
-        [[nodiscard]] HRESULT _HandleRunInput(const std::string_view u8Str);
+        [[nodiscard]]
+        HRESULT _HandleRunInput(_In_reads_(cch) const byte* const charBuffer, const int cch);
         DWORD _InputThread();
 
         wil::unique_hfile _hFile;
@@ -38,7 +41,7 @@ namespace Microsoft::Console
         bool _exitRequested;
         HRESULT _exitResult;
 
-        std::unique_ptr<Microsoft::Console::VirtualTerminal::StateMachine> _pInputStateMachine;
-        til::u8state _u8State;
+        std::unique_ptr<StateMachine> _pInputStateMachine;
+        Utf8ToWideCharParser _utf8Parser;
     };
 }

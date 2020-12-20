@@ -5,8 +5,8 @@
 
 #include "ProcessHandle.h"
 
-#include "../host/globals.h"
-#include "../host/telemetry.hpp"
+#include "..\host\globals.h"
+#include "..\host\telemetry.hpp"
 
 // Routine Description:
 // - Constructs an instance of the ConsoleProcessHandle Class
@@ -26,8 +26,7 @@ ConsoleProcessHandle::ConsoleProcessHandle(const DWORD dwProcessId,
     _hProcess(LOG_LAST_ERROR_IF_NULL(OpenProcess(MAXIMUM_ALLOWED,
                                                  FALSE,
                                                  dwProcessId))),
-    _policy(ConsoleProcessPolicy::s_CreateInstance(_hProcess.get())),
-    _shimPolicy(ConsoleShimPolicy::s_CreateInstance(_hProcess.get()))
+    _policy(ConsoleProcessPolicy::s_CreateInstance(_hProcess.get()))
 {
     if (nullptr != _hProcess.get())
     {
@@ -35,18 +34,12 @@ ConsoleProcessHandle::ConsoleProcessHandle(const DWORD dwProcessId,
     }
 }
 
-// Routine Description:
-// - Creates a CD_CONNECTION_INFORMATION (packet) that communicates the
-//   process, input and output handles to the driver as transformed by the
-//   DeviceComm's handle exchanger.
-// Arguments:
-// - deviceComm: IDeviceComm implementation with which to exchange handles.
-CD_CONNECTION_INFORMATION ConsoleProcessHandle::GetConnectionInformation(IDeviceComm* deviceComm) const
+CD_CONNECTION_INFORMATION ConsoleProcessHandle::GetConnectionInformation() const
 {
     CD_CONNECTION_INFORMATION result = { 0 };
-    result.Process = deviceComm->PutHandle(this);
-    result.Input = deviceComm->PutHandle(pInputHandle.get());
-    result.Output = deviceComm->PutHandle(pOutputHandle.get());
+    result.Process = reinterpret_cast<ULONG_PTR>(this);
+    result.Input = reinterpret_cast<ULONG_PTR>(pInputHandle.get());
+    result.Output = reinterpret_cast<ULONG_PTR>(pOutputHandle.get());
     return result;
 }
 
@@ -56,12 +49,4 @@ CD_CONNECTION_INFORMATION ConsoleProcessHandle::GetConnectionInformation(IDevice
 const ConsoleProcessPolicy ConsoleProcessHandle::GetPolicy() const
 {
     return _policy;
-}
-
-// Routine Description:
-// - Retrieves the policies set on this particular process handle
-// - This specifies compatibility shims that we might need to make for certain applications.
-const ConsoleShimPolicy ConsoleProcessHandle::GetShimPolicy() const
-{
-    return _shimPolicy;
 }

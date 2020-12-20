@@ -42,4 +42,5 @@ public:
 
 private:
     SCREEN_INFORMATION& _owner;
+
 };

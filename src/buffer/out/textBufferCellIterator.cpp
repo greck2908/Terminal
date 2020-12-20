@@ -17,7 +17,7 @@ using namespace Microsoft::Console::Types;
 // Routine Description:
 // - Creates a new read-only iterator to seek through cell data stored within a screen buffer
 // Arguments:
-// - buffer - Text buffer to seek through
+// - buffer - Text buffer to seek throught
 // - pos - Starting position to retrieve text data from (within screen buffer bounds)
 TextBufferCellIterator::TextBufferCellIterator(const TextBuffer& buffer, COORD pos) :
     TextBufferCellIterator(buffer, pos, buffer.GetSize())
@@ -68,11 +68,11 @@ TextBufferCellIterator::operator bool() const noexcept
 bool TextBufferCellIterator::operator==(const TextBufferCellIterator& it) const noexcept
 {
     return _pos == it._pos &&
-           &_buffer == &it._buffer &&
-           _exceeded == it._exceeded &&
-           _bounds == it._bounds &&
-           _pRow == it._pRow &&
-           _attrIter == it._attrIter;
+        &_buffer == &it._buffer &&
+        _exceeded == it._exceeded &&
+        _bounds == it._bounds &&
+        _pRow == it._pRow &&
+        _attrIter == it._attrIter;
 }
 
 // Routine Description:
@@ -212,7 +212,7 @@ void TextBufferCellIterator::_SetPos(const COORD newPos)
 
     if (newPos.X != _pos.X)
     {
-        const auto diff = gsl::narrow_cast<ptrdiff_t>(newPos.X) - gsl::narrow_cast<ptrdiff_t>(_pos.X);
+        const ptrdiff_t diff = newPos.X - _pos.X;
         _attrIter += diff;
     }
 

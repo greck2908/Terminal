@@ -5,21 +5,27 @@
 
 #include "ObjectHandle.h"
 
-#include "../host/globals.h"
-#include "../host/inputReadHandleData.h"
-#include "../host/input.h"
-#include "../host/screenInfo.hpp"
+#include "..\host\globals.h"
+#include "..\host\inputReadHandleData.h"
+#include "..\host\input.h"
+#include "..\host\screenInfo.hpp"
 
-#include "../interactivity/inc/ServiceLocator.hpp"
+#include "..\interactivity\inc\ServiceLocator.hpp"
 
-ConsoleHandleData::ConsoleHandleData(const ACCESS_MASK amAccess,
-                                     const ULONG ulShareAccess) :
-    _ulHandleType(HandleType::NotReady),
+ConsoleHandleData::ConsoleHandleData(const ULONG ulHandleType,
+                                     const ACCESS_MASK amAccess,
+                                     const ULONG ulShareAccess,
+                                     _In_ PVOID const pvClientPointer) :
+    _ulHandleType(ulHandleType),
     _amAccess(amAccess),
     _ulShareAccess(ulShareAccess),
-    _pvClientPointer(nullptr),
+    _pvClientPointer(pvClientPointer),
     _pClientInput(nullptr)
 {
+    if (_IsInput())
+    {
+        _pClientInput = std::make_unique<INPUT_READ_HANDLE_DATA>();
+    }
 }
 
 // Routine Description:
@@ -35,36 +41,9 @@ ConsoleHandleData::~ConsoleHandleData()
     {
         THROW_IF_FAILED(_CloseOutputHandle());
     }
-}
-
-// Routine Description:
-// - Holds the client pointer handle for future use after we've determined that
-//   we have the privileges to grant it to a particular client.
-// - This is separate from construction so this object can help with
-//   calculating the access type from the flags, but won't try to
-//   clean anything up until the ObjectHeader determines we have rights
-//   to use the object (and get it assigned here.)
-// Arguments:
-// - ulHandleType - specifies that the pointer given is input or output
-// - pvClientPointer - pointer to the object that has an ObjectHeader
-// Return Value:
-// - <none> - But will throw E_NOT_VALID_STATE (for trying to set twice) or
-//            E_INVALIDARG (for trying to set the NotReady handle type).
-void ConsoleHandleData::Initialize(const ULONG ulHandleType,
-                                   PVOID const pvClientPointer)
-{
-    // This can only be used once and it's an error if we try to initialize after it's been done.
-    THROW_HR_IF(E_NOT_VALID_STATE, _ulHandleType != HandleType::NotReady);
-
-    // We can't be initialized into the "not ready" state. Only constructed that way.
-    THROW_HR_IF(E_INVALIDARG, ulHandleType == HandleType::NotReady);
-
-    _ulHandleType = ulHandleType;
-    _pvClientPointer = pvClientPointer;
-
-    if (_IsInput())
+    else
     {
-        _pClientInput = std::make_unique<INPUT_READ_HANDLE_DATA>();
+        FAIL_FAST_HR(E_UNEXPECTED);
     }
 }
 
@@ -135,14 +114,15 @@ bool ConsoleHandleData::IsWriteShared() const
 }
 
 // Routine Description:
-// - Retrieves the properly typed Input Buffer from the Handle.
+// - Retieves the properly typed Input Buffer from the Handle.
 // Arguments:
 // - amRequested - Access that the client would like for manipulating the buffer
 // - ppInputBuffer - On success, filled with the referenced Input Buffer object
 // Return Value:
 // - HRESULT S_OK or suitable error.
-[[nodiscard]] HRESULT ConsoleHandleData::GetInputBuffer(const ACCESS_MASK amRequested,
-                                                        _Outptr_ InputBuffer** const ppInputBuffer) const
+[[nodiscard]]
+HRESULT ConsoleHandleData::GetInputBuffer(const ACCESS_MASK amRequested,
+                                          _Outptr_ InputBuffer** const ppInputBuffer) const
 {
     *ppInputBuffer = nullptr;
 
@@ -155,14 +135,15 @@ bool ConsoleHandleData::IsWriteShared() const
 }
 
 // Routine Description:
-// - Retrieves the properly typed Screen Buffer from the Handle.
+// - Retieves the properly typed Screen Buffer from the Handle.
 // Arguments:
 // - amRequested - Access that the client would like for manipulating the buffer
 // - ppInputBuffer - On success, filled with the referenced Screen Buffer object
 // Return Value:
 // - HRESULT S_OK or suitable error.
-[[nodiscard]] HRESULT ConsoleHandleData::GetScreenBuffer(const ACCESS_MASK amRequested,
-                                                         _Outptr_ SCREEN_INFORMATION** const ppScreenInfo) const
+[[nodiscard]]
+HRESULT ConsoleHandleData::GetScreenBuffer(const ACCESS_MASK amRequested,
+                                           _Outptr_ SCREEN_INFORMATION** const ppScreenInfo) const
 {
     *ppScreenInfo = nullptr;
 
@@ -180,9 +161,10 @@ bool ConsoleHandleData::IsWriteShared() const
 // - ppWaitQueue - On success, filled with a pointer to the desired queue
 // Return Value:
 // - HRESULT S_OK or E_UNEXPECTED if the handle data structure is in an invalid state.
-[[nodiscard]] HRESULT ConsoleHandleData::GetWaitQueue(_Outptr_ ConsoleWaitQueue** const ppWaitQueue) const
+[[nodiscard]]
+HRESULT ConsoleHandleData::GetWaitQueue(_Outptr_ ConsoleWaitQueue** const ppWaitQueue) const
 {
-    CONSOLE_INFORMATION& gci = Microsoft::Console::Interactivity::ServiceLocator::LocateGlobals().getConsoleInformation();
+    CONSOLE_INFORMATION& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
     if (_IsInput())
     {
         InputBuffer* const pObj = static_cast<InputBuffer*>(_pvClientPointer);
@@ -223,7 +205,8 @@ INPUT_READ_HANDLE_DATA* ConsoleHandleData::GetClientInput() const
 // - HRESULT S_OK or suitable error code.
 // Note:
 // - The console lock must be held when calling this routine.
-[[nodiscard]] HRESULT ConsoleHandleData::_CloseInputHandle()
+[[nodiscard]]
+HRESULT ConsoleHandleData::_CloseInputHandle()
 {
     FAIL_FAST_IF(!(_IsInput()));
     InputBuffer* pInputBuffer = static_cast<InputBuffer*>(_pvClientPointer);
@@ -262,7 +245,8 @@ INPUT_READ_HANDLE_DATA* ConsoleHandleData::GetClientInput() const
 // - HRESULT S_OK or suitable error code.
 // Note:
 // - The console lock must be held when calling this routine.
-[[nodiscard]] HRESULT ConsoleHandleData::_CloseOutputHandle()
+[[nodiscard]]
+HRESULT ConsoleHandleData::_CloseOutputHandle()
 {
     FAIL_FAST_IF(!(_IsOutput()));
     SCREEN_INFORMATION* pScreenInfo = static_cast<SCREEN_INFORMATION*>(_pvClientPointer);

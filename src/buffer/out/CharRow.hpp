@@ -24,16 +24,8 @@ Revision History:
 #include "CharRowCellReference.hpp"
 #include "CharRowCell.hpp"
 #include "UnicodeStorage.hpp"
-#include "boost/container/small_vector.hpp"
 
 class ROW;
-
-enum class DelimiterClass
-{
-    ControlChar,
-    DelimiterChar,
-    RegularChar
-};
 
 // the characters of one row of screen buffer
 // we keep the following values so that we don't write
@@ -50,22 +42,22 @@ class CharRow final
 public:
     using glyph_type = typename wchar_t;
     using value_type = typename CharRowCell;
-    using iterator = typename boost::container::small_vector_base<value_type>::iterator;
-    using const_iterator = typename boost::container::small_vector_base<value_type>::const_iterator;
-    using const_reverse_iterator = typename boost::container::small_vector_base<value_type>::const_reverse_iterator;
+    using iterator = typename std::vector<value_type>::iterator;
+    using const_iterator = typename std::vector<value_type>::const_iterator;
     using reference = typename CharRowCellReference;
 
-    CharRow(size_t rowWidth, ROW* const pParent) noexcept;
+    CharRow(size_t rowWidth, ROW* const pParent);
 
     void SetWrapForced(const bool wrap) noexcept;
     bool WasWrapForced() const noexcept;
     void SetDoubleBytePadded(const bool doubleBytePadded) noexcept;
     bool WasDoubleBytePadded() const noexcept;
     size_t size() const noexcept;
-    void Reset() noexcept;
-    [[nodiscard]] HRESULT Resize(const size_t newSize) noexcept;
-    size_t MeasureLeft() const noexcept;
-    size_t MeasureRight() const;
+    void Reset();
+    [[nodiscard]]
+    HRESULT Resize(const size_t newSize) noexcept;
+    size_t MeasureLeft() const;
+    size_t MeasureRight() const noexcept;
     void ClearCell(const size_t column);
     bool ContainsText() const noexcept;
     const DbcsAttribute& DbcsAttrAt(const size_t column) const;
@@ -73,7 +65,8 @@ public:
     void ClearGlyph(const size_t column);
     std::wstring GetText() const;
 
-    const DelimiterClass DelimiterClassAt(const size_t column, const std::wstring_view wordDelimiters) const;
+    // other functions implemented at the template class level
+    std::wstring GetTextRaw() const;
 
     // working with glyphs
     const reference GlyphAt(const size_t column) const;
@@ -86,11 +79,11 @@ public:
     iterator end() noexcept;
     const_iterator cend() const noexcept;
 
-    UnicodeStorage& GetUnicodeStorage() noexcept;
-    const UnicodeStorage& GetUnicodeStorage() const noexcept;
-    COORD GetStorageKey(const size_t column) const noexcept;
+    UnicodeStorage& GetUnicodeStorage();
+    const UnicodeStorage& GetUnicodeStorage() const;
+    COORD GetStorageKey(const size_t column) const;
 
-    void UpdateParent(ROW* const pParent);
+    void UpdateParent(ROW* const pParent) noexcept;
 
     friend CharRowCellReference;
     friend constexpr bool operator==(const CharRow& a, const CharRow& b) noexcept;
@@ -103,7 +96,7 @@ protected:
     bool _doubleBytePadded;
 
     // storage for glyph data and dbcs attributes
-    boost::container::small_vector<value_type, 120> _data;
+    std::vector<value_type> _data;
 
     // ROW that this CharRow belongs to
     ROW* _pParent;
@@ -123,7 +116,8 @@ void OverwriteColumns(InputIt1 startChars, InputIt1 endChars, InputIt2 startAttr
                    endChars,
                    startAttrs,
                    outIt,
-                   [](const wchar_t wch, const DbcsAttribute attr) {
-                       return CharRow::value_type{ wch, attr };
-                   });
+                   [](const wchar_t wch, const DbcsAttribute attr)
+    {
+        return CharRow::value_type{ wch, attr };
+    });
 }

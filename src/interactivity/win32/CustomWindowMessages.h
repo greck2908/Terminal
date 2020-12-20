@@ -3,8 +3,6 @@
 
 #pragma once
 
-// clang-format off
-
 // Custom window messages
 #define CM_SET_WINDOW_SIZE       (WM_USER + 2)
 #define CM_BEEP                  (WM_USER + 3)
@@ -28,5 +26,3 @@
 #define CM_SET_KEY_STATE         (WM_USER+18)
 #define CM_SET_KEYBOARD_LAYOUT   (WM_USER+19)
 #endif
-
-// clang-format on

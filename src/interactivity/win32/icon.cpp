@@ -7,7 +7,7 @@
 
 #include "window.hpp"
 
-#include "../inc/ServiceLocator.hpp"
+#include "..\inc\ServiceLocator.hpp"
 
 using namespace Microsoft::Console::Interactivity::Win32;
 
@@ -18,6 +18,7 @@ Icon::Icon() :
     _hIcon(nullptr),
     _hSmIcon(nullptr)
 {
+
 }
 
 Icon::~Icon()
@@ -49,7 +50,8 @@ Icon& Icon::Instance()
 // - phSmIcon - The small icon representation.
 // Return Value:
 // - S_OK or HRESULT failure code.
-[[nodiscard]] HRESULT Icon::GetIcons(_Out_opt_ HICON* const phIcon, _Out_opt_ HICON* const phSmIcon)
+[[nodiscard]]
+HRESULT Icon::GetIcons(_Out_opt_ HICON* const phIcon, _Out_opt_ HICON* const phSmIcon)
 {
     HRESULT hr = S_OK;
 
@@ -76,7 +78,8 @@ Icon& Icon::Instance()
 // - hSmIcon - The small icon handle or null to reset to default
 // Return Value:
 // - S_OK or HRESULT failure code.
-[[nodiscard]] HRESULT Icon::SetIcons(const HICON hIcon, const HICON hSmIcon)
+[[nodiscard]]
+HRESULT Icon::SetIcons(const HICON hIcon, const HICON hSmIcon)
 {
     HRESULT hr = _SetIconFromReference(_hIcon, hIcon);
 
@@ -117,7 +120,8 @@ Icon& Icon::Instance()
 // - nIconIndex - Index offset of the icon within the file
 // Return Value:
 // - S_OK or HRESULT failure code.
-[[nodiscard]] HRESULT Icon::LoadIconsFromPath(_In_ PCWSTR pwszIconLocation, const int nIconIndex)
+[[nodiscard]]
+HRESULT Icon::LoadIconsFromPath(_In_ PCWSTR pwszIconLocation, const  int nIconIndex)
 {
     HRESULT hr = S_OK;
 
@@ -144,7 +148,8 @@ Icon& Icon::Instance()
 // - hwnd - Handle to apply message workaround to.
 // Return Value:
 // - S_OK or HRESULT failure code.
-[[nodiscard]] HRESULT Icon::ApplyWindowMessageWorkaround(const HWND hwnd)
+[[nodiscard]]
+HRESULT Icon::ApplyWindowMessageWorkaround(const HWND hwnd)
 {
     HICON hIcon;
     HICON hSmIcon;
@@ -166,16 +171,17 @@ Icon& Icon::Instance()
 // - <none>
 // Return Value:
 // - S_OK or HRESULT failure code.
-[[nodiscard]] HRESULT Icon::_Initialize()
+[[nodiscard]]
+HRESULT Icon::_Initialize()
 {
     HRESULT hr = S_OK;
 
     if (!_fInitialized)
     {
-#pragma warning(push)
-#pragma warning(disable : 4302) // typecast warning from MAKEINTRESOURCE
+        #pragma warning(push)
+        #pragma warning(disable:4302) // typecast warning from MAKEINTRESOURCE
         _hDefaultIcon = LoadIconW(nullptr, MAKEINTRESOURCE(IDI_APPLICATION));
-#pragma warning(pop)
+        #pragma warning(pop)
 
         if (_hDefaultIcon == nullptr)
         {
@@ -184,15 +190,16 @@ Icon& Icon::Instance()
 
         if (SUCCEEDED(hr))
         {
-#pragma warning(push)
-#pragma warning(disable : 4302) // typecast warning from MAKEINTRESOURCE
+            #pragma warning(push)
+            #pragma warning(disable:4302) // typecast warning from MAKEINTRESOURCE
             _hDefaultSmIcon = (HICON)LoadImageW(nullptr,
-                                                MAKEINTRESOURCE(IDI_APPLICATION),
-                                                IMAGE_ICON,
-                                                GetSystemMetrics(SM_CXSMICON),
-                                                GetSystemMetrics(SM_CYSMICON),
-                                                LR_SHARED);
-#pragma warning(pop)
+                                               MAKEINTRESOURCE(IDI_APPLICATION),
+                                               IMAGE_ICON,
+                                               GetSystemMetrics(SM_CXSMICON),
+                                               GetSystemMetrics(SM_CYSMICON),
+                                               LR_SHARED
+                                               );
+            #pragma warning(pop)
 
             if (_hDefaultSmIcon == nullptr)
             {
@@ -230,7 +237,8 @@ void Icon::_DestroyNonDefaultIcons()
 // - phIcon - pointer to receive the chosen icon handle
 // Return Value:
 // - S_OK or HRESULT failure code.
-[[nodiscard]] HRESULT Icon::_GetAvailableIconFromReference(_In_ HICON& hIconRef, _In_ HICON& hDefaultIconRef, _Out_ HICON* const phIcon)
+[[nodiscard]]
+HRESULT Icon::_GetAvailableIconFromReference(_In_ HICON& hIconRef, _In_ HICON& hDefaultIconRef, _Out_ HICON* const phIcon)
 {
     HRESULT hr = S_OK;
 
@@ -259,7 +267,8 @@ void Icon::_DestroyNonDefaultIcons()
 // - phIcon - The pointer to fill with the icon if it is available.
 // Return Value:
 // - S_OK or HRESULT failure code.
-[[nodiscard]] HRESULT Icon::_GetDefaultIconFromReference(_In_ HICON& hIconRef, _Out_ HICON* const phIcon)
+[[nodiscard]]
+HRESULT Icon::_GetDefaultIconFromReference(_In_ HICON& hIconRef, _Out_ HICON* const phIcon)
 {
     // expecting hIconRef to be pointing to either the regular or small default handles
     FAIL_FAST_IF(!(&hIconRef == &_hDefaultIcon || &hIconRef == &_hDefaultSmIcon));
@@ -282,7 +291,8 @@ void Icon::_DestroyNonDefaultIcons()
 // - hNewIcon - The new icon handle to replace the reference with.
 // Return Value:
 // - S_OK or HRESULT failure code.
-[[nodiscard]] HRESULT Icon::_SetIconFromReference(_In_ HICON& hIconRef, const HICON hNewIcon)
+[[nodiscard]]
+HRESULT Icon::_SetIconFromReference(_In_ HICON& hIconRef, const HICON hNewIcon)
 {
     // expecting hIconRef to be pointing to either the regular or small custom handles
     FAIL_FAST_IF(!(&hIconRef == &_hIcon || &hIconRef == &_hSmIcon));

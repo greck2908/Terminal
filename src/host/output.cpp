@@ -15,18 +15,17 @@
 #include "../types/inc/convert.hpp"
 
 #pragma hdrstop
-
 using namespace Microsoft::Console::Types;
-using namespace Microsoft::Console::Interactivity;
 
 // This routine figures out what parameters to pass to CreateScreenBuffer based on the data from STARTUPINFO and the
 // registry defaults, and then calls CreateScreenBuffer.
-[[nodiscard]] NTSTATUS DoCreateScreenBuffer()
+[[nodiscard]]
+NTSTATUS DoCreateScreenBuffer()
 {
     CONSOLE_INFORMATION& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
 
     FontInfo fiFont(gci.GetFaceName(),
-                    gsl::narrow_cast<unsigned char>(gci.GetFontFamily()),
+                    static_cast<BYTE>(gci.GetFontFamily()),
                     gci.GetFontWeight(),
                     gci.GetFontSize(),
                     gci.GetCodePage());
@@ -41,7 +40,7 @@ using namespace Microsoft::Console::Interactivity;
     NTSTATUS Status = SCREEN_INFORMATION::CreateInstance(gci.GetWindowSize(),
                                                          fiFont,
                                                          gci.GetScreenBufferSize(),
-                                                         TextAttribute{},
+                                                         gci.GetDefaultAttributes(),
                                                          TextAttribute{ gci.GetPopupFillAttribute() },
                                                          gci.GetCursorSize(),
                                                          &gci.ScreenBuffers);
@@ -148,18 +147,16 @@ std::vector<WORD> ReadOutputAttributes(const SCREEN_INFORMATION& screenInfo,
     // While we haven't read enough cells yet and the iterator is still valid (hasn't reached end of buffer)
     while (amountRead < amountToRead && it)
     {
-        const auto legacyAttributes = it->TextAttr().GetLegacyAttributes();
-
         // If the first thing we read is trailing, pad with a space.
         // OR If the last thing we read is leading, pad with a space.
         if ((amountRead == 0 && it->DbcsAttr().IsTrailing()) ||
             (amountRead == (amountToRead - 1) && it->DbcsAttr().IsLeading()))
         {
-            retVal.push_back(legacyAttributes);
+            retVal.push_back(it->TextAttr().GetLegacyAttributes());
         }
         else
         {
-            retVal.push_back(legacyAttributes | it->DbcsAttr().GeneratePublicApiAttributeFormat());
+            retVal.push_back(it->TextAttr().GetLegacyAttributes() | it->DbcsAttr().GeneratePublicApiAttributeFormat());
         }
 
         amountRead++;
@@ -273,7 +270,7 @@ static void _ScrollScreen(SCREEN_INFORMATION& screenInfo, const Viewport& source
 {
     if (screenInfo.IsActiveScreenBuffer())
     {
-        IAccessibilityNotifier* pNotifier = ServiceLocator::LocateAccessibilityNotifier();
+        IAccessibilityNotifier *pNotifier = ServiceLocator::LocateAccessibilityNotifier();
         if (pNotifier != nullptr)
         {
             pNotifier->NotifyConsoleUpdateScrollEvent(target.Origin().X - source.Left(), target.Origin().Y - source.RightInclusive());
@@ -298,8 +295,7 @@ static void _ScrollScreen(SCREEN_INFORMATION& screenInfo, const Viewport& source
 bool StreamScrollRegion(SCREEN_INFORMATION& screenInfo)
 {
     // Rotate the circular buffer around and wipe out the previous final line.
-    const bool inVtMode = WI_IsFlagSet(screenInfo.OutputMode, ENABLE_VIRTUAL_TERMINAL_PROCESSING);
-    bool fSuccess = screenInfo.GetTextBuffer().IncrementCircularBuffer(inVtMode);
+    bool fSuccess = screenInfo.GetTextBuffer().IncrementCircularBuffer();
     if (fSuccess)
     {
         // Trigger a graphical update if we're active.
@@ -308,7 +304,7 @@ bool StreamScrollRegion(SCREEN_INFORMATION& screenInfo)
             COORD coordDelta = { 0 };
             coordDelta.Y = -1;
 
-            IAccessibilityNotifier* pNotifier = ServiceLocator::LocateAccessibilityNotifier();
+            IAccessibilityNotifier *pNotifier = ServiceLocator::LocateAccessibilityNotifier();
             if (pNotifier)
             {
                 // Notify accessibility that a scroll has occurred.
@@ -364,6 +360,19 @@ void ScrollRegion(SCREEN_INFORMATION& screenInfo,
     // If there was no clip rect, we'll clip to the entire buffer size.
     auto clip = Viewport::FromInclusive(clipRectGiven.value_or(buffer.ToInclusive()));
 
+    // Account for the scroll margins set by DECSTBM
+    // DECSTBM command can sometimes apply a clipping behavior as well. Check if we have any
+    // margins defined by DECSTBM and further restrict the clipping area here.
+    if (screenInfo.AreMarginsSet())
+    {
+        const auto margin = screenInfo.GetScrollingRegion();
+
+        // Update the clip rectangle to only include the area that is also in the margin.
+        clip = Viewport::Intersect(clip, margin);
+
+        // We'll also need to update the source rectangle, but we need to do that later.
+    }
+
     // OK, make sure that the clip rectangle also fits inside the buffer
     clip = Viewport::Intersect(buffer, clip);
 
@@ -386,7 +395,7 @@ void ScrollRegion(SCREEN_INFORMATION& screenInfo,
 
     // However, if the character is null and we were given a null attribute (represented as legacy 0),
     // then we'll just fill with spaces and whatever the buffer's default colors are.
-    if (fillCharGiven == UNICODE_NULL && fillAttrsGiven == TextAttribute{ 0 })
+    if (fillCharGiven == UNICODE_NULL && fillAttrsGiven.IsLegacy() && fillAttrsGiven.GetLegacyAttributes() == 0)
     {
         fillData = OutputCellIterator(UNICODE_SPACE, screenInfo.GetAttributes());
     }
@@ -404,6 +413,18 @@ void ScrollRegion(SCREEN_INFORMATION& screenInfo,
         auto currentSourceOrigin = source.Origin();
         targetOrigin.X += currentSourceOrigin.X - originalSourceOrigin.X;
         targetOrigin.Y += currentSourceOrigin.Y - originalSourceOrigin.Y;
+    }
+
+    // See MSFT:20204600 - Update the source rectangle to only include the region
+    //      inside the scroll margins. We need to do this AFTER we calculate the
+    //      delta between the currentSourceOrigin and the originalSourceOrigin.
+    // Don't combine this with the above block, because if there are margins set
+    //      and the source rectangle was clipped by the buffer, we still want to
+    //      adjust the target origin point based on the clipping of the buffer.
+    if (screenInfo.AreMarginsSet())
+    {
+        const auto margin = screenInfo.GetScrollingRegion();
+        source = Viewport::Intersect(source, margin);
     }
 
     // And now the target viewport is the same size as the source viewport but at the different position.
@@ -459,20 +480,8 @@ void SetActiveScreenBuffer(SCREEN_INFORMATION& screenInfo)
     CONSOLE_INFORMATION& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
     gci.pCurrentScreenBuffer = &screenInfo;
 
-    // initialize cursor GH#4102 - Typically, the cursor is set to on by the
-    // cursor blinker. Unfortunately, in conpty mode, there is no cursor
-    // blinker. So, in conpty mode, we need to leave the cursor on always. The
-    // cursor can still be set to hidden, and whether the cursor should be
-    // blinking will still be passed through to the terminal, but internally,
-    // the cursor should always be on.
-    //
-    // In particular, some applications make use of a calling
-    // `SetConsoleScreenBuffer` and `SetCursorPosition` without printing any
-    // text in between these calls. If we initialize the cursor to Off in conpty
-    // mode, then the cursor will remain off until they print text. This can
-    // lead to alignment problems in the terminal, because we won't move the
-    // terminal's cursor in this _exact_ scenario.
-    screenInfo.GetTextBuffer().GetCursor().SetIsOn(gci.IsInVtIoMode());
+    // initialize cursor
+    screenInfo.GetTextBuffer().GetCursor().SetIsOn(false);
 
     // set font
     screenInfo.RefreshFontWithRenderer();
@@ -508,7 +517,7 @@ void CloseConsoleProcessState()
     // Jiggle the handle: (see MSFT:19419231)
     // When we call this function, we'll only actually close the console once
     //      we're totally unlocked. If our caller has the console locked, great,
-    //      we'll dispatch the ctrl event once they unlock. However, if they're
+    //      we'll displatch the ctrl event once they unlock. However, if they're
     //      not running under lock (eg PtySignalInputThread::_GetData), then the
     //      ctrl event will never actually get dispatched.
     // So, lock and unlock here, to make sure the ctrl event gets handled.

@@ -14,21 +14,19 @@
 #include "dbcs.h"
 #include "handle.h"
 #include "misc.h"
+#include "utf8ToWidecharParser.hpp"
 
 #include "../types/inc/convert.hpp"
 #include "../types/inc/GlyphWidth.hpp"
 #include "../types/inc/Viewport.hpp"
 
-#include "../interactivity/inc/ServiceLocator.hpp"
+#include "..\interactivity\inc\ServiceLocator.hpp"
 
 #pragma hdrstop
 using namespace Microsoft::Console::Types;
-using Microsoft::Console::Interactivity::ServiceLocator;
-using Microsoft::Console::VirtualTerminal::StateMachine;
-// Used by WriteCharsLegacy.
-#define IS_GLYPH_CHAR(wch) (((wch) >= L' ') && ((wch) != 0x007F))
 
-constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
+// Used by WriteCharsLegacy.
+#define IS_GLYPH_CHAR(wch)   (((wch) < L' ') || ((wch) == 0x007F))
 
 // Routine Description:
 // - This routine updates the cursor position.  Its input is the non-special
@@ -41,12 +39,12 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
 // - coordCursor - New location of cursor.
 // - fKeepCursorVisible - TRUE if changing window origin desirable when hit right edge
 // Return Value:
-[[nodiscard]] NTSTATUS AdjustCursorPosition(SCREEN_INFORMATION& screenInfo,
-                                            _In_ COORD coordCursor,
-                                            const BOOL fKeepCursorVisible,
-                                            _Inout_opt_ PSHORT psScrollY)
+[[nodiscard]]
+NTSTATUS AdjustCursorPosition(SCREEN_INFORMATION& screenInfo,
+                              _In_ COORD coordCursor,
+                              const BOOL fKeepCursorVisible,
+                              _Inout_opt_ PSHORT psScrollY)
 {
-    const bool inVtMode = WI_IsFlagSet(screenInfo.OutputMode, ENABLE_VIRTUAL_TERMINAL_PROCESSING);
     const COORD bufferSize = screenInfo.GetBufferSize().Dimensions();
     if (coordCursor.X < 0)
     {
@@ -70,23 +68,11 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
         }
         else
         {
-            if (inVtMode)
-            {
-                // In VT mode, the cursor must be left in the last column.
-                coordCursor.X = bufferSize.X - 1;
-            }
-            else
-            {
-                // For legacy apps, it is left where it was at the start of the write.
-                coordCursor.X = screenInfo.GetTextBuffer().GetCursor().GetPosition().X;
-            }
+            coordCursor.X = screenInfo.GetTextBuffer().GetCursor().GetPosition().X;
         }
     }
 
-    // The VT standard requires the lines revealed when scrolling are filled
-    // with the current background color, but with no meta attributes set.
-    auto fillAttributes = screenInfo.GetAttributes();
-    fillAttributes.SetStandardErase();
+    const auto bufferAttributes = screenInfo.GetAttributes();
 
     const auto relativeMargins = screenInfo.GetRelativeScrollMargins();
     auto viewport = screenInfo.GetViewport();
@@ -94,6 +80,7 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
     const bool fMarginsSet = srMargins.Bottom > srMargins.Top;
     COORD currentCursor = screenInfo.GetTextBuffer().GetCursor().GetPosition();
     const int iCurrentCursorY = currentCursor.Y;
+    const bool inVtMode = WI_IsFlagSet(screenInfo.OutputMode, ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 
     const bool fCursorInMargins = iCurrentCursorY <= srMargins.Bottom && iCurrentCursorY >= srMargins.Top;
     const bool cursorAboveViewport = coordCursor.Y < 0 && inVtMode;
@@ -122,7 +109,7 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
         //  margin down, then move the viewport down.
 
         const SHORT delta = coordCursor.Y - srMargins.Bottom;
-        SMALL_RECT scrollRect{ 0 };
+        SMALL_RECT scrollRect{0};
         scrollRect.Left = 0;
         scrollRect.Top = srMargins.Bottom + 1; // One below margins
         scrollRect.Bottom = bufferSize.Y - 1; // -1, otherwise this would be an exclusive rect.
@@ -142,7 +129,7 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
         //      new rows at the bottom.
         // If we do this, then the viewport is now one line higher than it used
         //      to be, so it needs to move down by one less line.
-        for (auto i = 0; i < newRows; i++)
+        for(auto i = 0; i < newRows; i++)
         {
             screenInfo.GetTextBuffer().IncrementCircularBuffer();
             moveToYPosition--;
@@ -153,11 +140,15 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
         const COORD newPostMarginsOrigin = { 0, moveToYPosition };
         const COORD newViewOrigin = { 0, newViewTop };
 
+        // Unset the margins to scroll the content below the margins,
+        //      then restore them after.
+        screenInfo.SetScrollMargins(Viewport::FromInclusive({0}));
         try
         {
-            ScrollRegion(screenInfo, scrollRect, std::nullopt, newPostMarginsOrigin, UNICODE_SPACE, fillAttributes);
+            ScrollRegion(screenInfo, scrollRect, std::nullopt, newPostMarginsOrigin, UNICODE_SPACE, bufferAttributes);
         }
         CATCH_LOG();
+        screenInfo.SetScrollMargins(relativeMargins);
 
         // Move the viewport down
         auto hr = screenInfo.SetViewportOrigin(true, newViewOrigin, true);
@@ -171,33 +162,7 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
         //      displays the correct text.
         if (newViewOrigin == viewport.Origin())
         {
-            // Inside this block, we're shifting down at the bottom.
-            // This means that we had something like this:
-            // AAAA
-            // BBBB
-            // CCCC
-            // DDDD
-            // EEEE
-            //
-            // Our margins were set for lines A-D, but not on line E.
-            // So we circled the whole buffer up by one:
-            // BBBB
-            // CCCC
-            // DDDD
-            // EEEE
-            // <blank, was AAAA>
-            //
-            // Then we scrolled the contents of everything OUTSIDE the margin frame down.
-            // BBBB
-            // CCCC
-            // DDDD
-            // <blank, filled during scroll down of EEEE>
-            // EEEE
-            //
-            // And now we need to report that only the bottom line didn't "move" as we put the EEEE
-            // back where it started, but everything else moved.
-            // In this case, delta was 1. So the amount that moved is the entire viewport height minus the delta.
-            Viewport invalid = Viewport::FromDimensions(viewport.Origin(), { viewport.Width(), viewport.Height() - delta });
+            Viewport invalid = Viewport::FromDimensions(viewport.Origin(), {viewport.Width(), delta});
             screenInfo.GetRenderTarget().TriggerRedraw(invalid);
         }
 
@@ -221,29 +186,40 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
         SMALL_RECT scrollRect = { 0 };
         scrollRect.Top = srMargins.Top;
         scrollRect.Bottom = srMargins.Bottom;
-        scrollRect.Left = 0; // NOTE: Left/Right Scroll margins don't do anything currently.
-        scrollRect.Right = bufferSize.X - 1; // -1, otherwise this would be an exclusive rect.
+        scrollRect.Left = screenInfo.GetViewport().Left();  // NOTE: Left/Right Scroll margins don't do anything currently.
+        scrollRect.Right = screenInfo.GetViewport().RightInclusive();
 
         COORD dest;
         dest.X = scrollRect.Left;
         dest.Y = scrollRect.Top - diff;
 
+        SMALL_RECT clipRect = scrollRect;
+        // Typically ScrollRegion() clips by the scroll margins. However, if
+        //      we're scrolling down at the top of the viewport, we'll need to
+        //      not clip at the margins, instead move the contents of the margins
+        //      up above the viewport. So we'll clear out the current margins, and
+        //      set them to the viewport+(#diff rows above the viewport).
+        if (scrollDownAtTop)
+        {
+            clipRect.Top -= diff;
+            auto fakeMargins = srMargins;
+            fakeMargins.Top -= diff;
+            auto fakeRelative = viewport.ConvertToOrigin(Viewport::FromInclusive(fakeMargins));
+            screenInfo.SetScrollMargins(fakeRelative);
+        }
+
         try
         {
-            ScrollRegion(screenInfo, scrollRect, scrollRect, dest, UNICODE_SPACE, fillAttributes);
+            ScrollRegion(screenInfo, scrollRect, clipRect, dest, UNICODE_SPACE, bufferAttributes);
         }
         CATCH_LOG();
 
+        if (scrollDownAtTop)
+        {
+            // Undo the fake margins we set above
+            screenInfo.SetScrollMargins(relativeMargins);
+        }
         coordCursor.Y -= diff;
-    }
-
-    // If the margins are set, then it shouldn't be possible for the cursor to
-    //   move below the bottom of the viewport. Either it should be constrained
-    //   inside the margins by one of the scrollDown cases handled above, or
-    //   we'll need to clamp it inside the viewport here.
-    if (fMarginsSet && coordCursor.Y > viewport.BottomInclusive())
-    {
-        coordCursor.Y = viewport.BottomInclusive();
     }
 
     NTSTATUS Status = STATUS_SUCCESS;
@@ -323,15 +299,16 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
 // Return Value:
 // Note:
 // - This routine does not process tabs and backspace properly.  That code will be implemented as part of the line editing services.
-[[nodiscard]] NTSTATUS WriteCharsLegacy(SCREEN_INFORMATION& screenInfo,
-                                        _In_range_(<=, pwchBuffer) const wchar_t* const pwchBufferBackupLimit,
-                                        _In_ const wchar_t* pwchBuffer,
-                                        _In_reads_bytes_(*pcb) const wchar_t* pwchRealUnicode,
-                                        _Inout_ size_t* const pcb,
-                                        _Out_opt_ size_t* const pcSpaces,
-                                        const SHORT sOriginalXPosition,
-                                        const DWORD dwFlags,
-                                        _Inout_opt_ PSHORT const psScrollY)
+[[nodiscard]]
+NTSTATUS WriteCharsLegacy(SCREEN_INFORMATION& screenInfo,
+                          _In_range_(<= , pwchBuffer) const wchar_t* const pwchBufferBackupLimit,
+                          _In_ const wchar_t* pwchBuffer,
+                          _In_reads_bytes_(*pcb) const wchar_t* pwchRealUnicode,
+                          _Inout_ size_t* const pcb,
+                          _Out_opt_ size_t* const pcSpaces,
+                          const SHORT sOriginalXPosition,
+                          const DWORD dwFlags,
+                          _Inout_opt_ PSHORT const psScrollY)
 {
     const CONSOLE_INFORMATION& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
     TextBuffer& textBuffer = screenInfo.GetTextBuffer();
@@ -342,7 +319,6 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
     WCHAR LocalBuffer[LOCAL_BUFFER_SIZE];
     size_t TempNumSpaces = 0;
     const bool fUnprocessed = WI_IsFlagClear(screenInfo.OutputMode, ENABLE_PROCESSED_OUTPUT);
-    const bool fWrapAtEOL = WI_IsFlagSet(screenInfo.OutputMode, ENABLE_WRAP_AT_EOL_OUTPUT);
 
     // Must not adjust cursor here. It has to stay on for many write scenarios. Consumers should call for the
     // cursor to be turned off if they want that.
@@ -358,19 +334,66 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
     while (*pcb < BufferSize)
     {
         // correct for delayed EOL
-        if (cursor.IsDelayedEOLWrap() && fWrapAtEOL)
+        if (cursor.IsDelayedEOLWrap())
         {
             const COORD coordDelayedAt = cursor.GetDelayedAtPosition();
             cursor.ResetDelayEOLWrap();
             // Only act on a delayed EOL if we didn't move the cursor to a different position from where the EOL was marked.
             if (coordDelayedAt.X == CursorPosition.X && coordDelayedAt.Y == CursorPosition.Y)
             {
-                CursorPosition.X = 0;
-                CursorPosition.Y++;
+                bool fDoEolWrap = false;
 
-                Status = AdjustCursorPosition(screenInfo, CursorPosition, WI_IsFlagSet(dwFlags, WC_KEEP_CURSOR_VISIBLE), psScrollY);
+                if (WI_IsFlagSet(dwFlags, WC_DELAY_EOL_WRAP))
+                {
+                    // Correct if it's a printable character and whoever called us still understands/wants delayed EOL wrap.
+                    if (*lpString >= UNICODE_SPACE)
+                    {
+                        fDoEolWrap = true;
+                    }
+                    else if (*lpString == UNICODE_BACKSPACE)
+                    {
+                        // if we have an active wrap and a backspace comes in, process it by moving the cursor
+                        // back one cell position unless it's already at the start of a row.
+                        *pcb += sizeof(WCHAR);
+                        lpString++;
+                        pwchRealUnicode++;
+                        if (CursorPosition.X != 0)
+                        {
+                            --CursorPosition.X;
+                            Status = AdjustCursorPosition(screenInfo, CursorPosition, WI_IsFlagSet(dwFlags, WC_KEEP_CURSOR_VISIBLE), psScrollY);
+                            CursorPosition = cursor.GetPosition();
+                        }
+                        continue;
+                    }
+                }
+                else
+                {
+                    // Uh oh, we've hit a consumer that doesn't know about delayed end of lines. To rectify this, just quickly jump
+                    // forward to the next line as if we had done it earlier, then let everything else play out normally.
+                    fDoEolWrap = true;
+                }
 
-                CursorPosition = cursor.GetPosition();
+                if (fDoEolWrap)
+                {
+                    CursorPosition.X = 0;
+                    CursorPosition.Y++;
+
+                    Status = AdjustCursorPosition(screenInfo, CursorPosition, WI_IsFlagSet(dwFlags, WC_KEEP_CURSOR_VISIBLE), psScrollY);
+
+                    CursorPosition = cursor.GetPosition();
+                }
+            }
+        }
+
+        if (screenInfo.InVTMode())
+        {
+            // if we're at the beginning of a row and we get a backspace and told to limit backspacing, skip it
+            if (*lpString == UNICODE_BACKSPACE && CursorPosition.X == 0 && WI_IsFlagSet(dwFlags, WC_LIMIT_BACKSPACE))
+            {
+                *pcb += sizeof(wchar_t);
+                ++lpString;
+                ++pwchRealUnicode;
+                continue;
             }
         }
 
@@ -380,10 +403,10 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
         wchar_t* LocalBufPtr = LocalBuffer;
         while (*pcb < BufferSize && i < LOCAL_BUFFER_SIZE && XPosition < coordScreenBufferSize.X)
         {
-#pragma prefast(suppress : 26019, "Buffer is taken in multiples of 2. Validation is ok.")
+#pragma prefast(suppress:26019, "Buffer is taken in multiples of 2. Validation is ok.")
             const wchar_t Char = *lpString;
             const wchar_t RealUnicodeChar = *pwchRealUnicode;
-            if (IS_GLYPH_CHAR(RealUnicodeChar) || fUnprocessed)
+            if (!IS_GLYPH_CHAR(RealUnicodeChar) || fUnprocessed)
             {
                 if (IsGlyphFullWidth(Char))
                 {
@@ -437,23 +460,28 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
                     goto EndWhile;
                     break;
                 case UNICODE_TAB:
-                {
-                    const ULONG TabSize = NUMBER_OF_SPACES_IN_TAB(XPosition);
-                    XPosition = (SHORT)(XPosition + TabSize);
-                    if (XPosition >= coordScreenBufferSize.X)
+                    if (screenInfo.InVTMode())
                     {
                         goto EndWhile;
                     }
-
-                    for (ULONG j = 0; j < TabSize && i < LOCAL_BUFFER_SIZE; j++, i++)
+                    else
                     {
-                        *LocalBufPtr = UNICODE_SPACE;
-                        LocalBufPtr++;
+                        const ULONG TabSize = NUMBER_OF_SPACES_IN_TAB(XPosition);
+                        XPosition = (SHORT)(XPosition + TabSize);
+                        if (XPosition >= coordScreenBufferSize.X || WI_IsFlagSet(dwFlags, WC_NONDESTRUCTIVE_TAB))
+                        {
+                            goto EndWhile;
+                        }
+
+                        for (ULONG j = 0; j < TabSize && i < LOCAL_BUFFER_SIZE; j++, i++)
+                        {
+                            *LocalBufPtr = UNICODE_SPACE;
+                            LocalBufPtr++;
+                        }
                     }
 
                     pwchBuffer++;
                     break;
-                }
                 case UNICODE_LINEFEED:
                 case UNICODE_CARRIAGERETURN:
                     goto EndWhile;
@@ -462,6 +490,7 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
                     // if char is ctrl char, write ^char.
                     if ((dwFlags & WC_ECHO) && (IS_CONTROL_CHAR(RealUnicodeChar)))
                     {
+
                     CtrlChar:
                         if (i < (LOCAL_BUFFER_SIZE - 1))
                         {
@@ -484,29 +513,26 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
                     }
                     else
                     {
-                        if (Char == UNICODE_NULL)
+                        // As a special favor to incompetent apps that attempt to display control chars,
+                        // convert to corresponding OEM Glyph Chars
+                        WORD CharType;
+
+                        GetStringTypeW(CT_CTYPE1, &RealUnicodeChar, 1, &CharType);
+                        if (CharType == C1_CNTRL)
+                        {
+                            ConvertOutputToUnicode(gci.OutputCP,
+                                                   (LPSTR)&RealUnicodeChar,
+                                                   1,
+                                                   LocalBufPtr,
+                                                   1);
+                        }
+                        else if (Char == UNICODE_NULL)
                         {
                             *LocalBufPtr = UNICODE_SPACE;
                         }
                         else
                         {
-                            // As a special favor to incompetent apps that attempt to display control chars,
-                            // convert to corresponding OEM Glyph Chars
-                            WORD CharType;
-
-                            GetStringTypeW(CT_CTYPE1, &RealUnicodeChar, 1, &CharType);
-                            if (WI_IsFlagSet(CharType, C1_CNTRL))
-                            {
-                                ConvertOutputToUnicode(gci.OutputCP,
-                                                       (LPSTR)&RealUnicodeChar,
-                                                       1,
-                                                       LocalBufPtr,
-                                                       1);
-                            }
-                            else
-                            {
-                                *LocalBufPtr = Char;
-                            }
+                            *LocalBufPtr = Char;
                         }
 
                         LocalBufPtr++;
@@ -526,9 +552,9 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
             CursorPosition = cursor.GetPosition();
 
             // Make sure we don't write past the end of the buffer.
-            if (i > gsl::narrow_cast<size_t>(coordScreenBufferSize.X) - CursorPosition.X)
+            if (i > (ULONG)coordScreenBufferSize.X - CursorPosition.X)
             {
-                i = gsl::narrow_cast<size_t>(coordScreenBufferSize.X) - CursorPosition.X;
+                i = (ULONG)coordScreenBufferSize.X - CursorPosition.X;
             }
 
             // line was wrapped if we're writing up to the end of the current row
@@ -536,7 +562,8 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
             const auto itEnd = screenInfo.Write(it);
 
             // Notify accessibility
-            screenInfo.NotifyAccessibilityEventing(CursorPosition.X, CursorPosition.Y, CursorPosition.X + gsl::narrow<SHORT>(i - 1), CursorPosition.Y);
+            screenInfo.NotifyAccessibilityEventing(CursorPosition.X, CursorPosition.Y,
+                                                   CursorPosition.X + gsl::narrow<SHORT>(i - 1), CursorPosition.Y);
 
             // The number of "spaces" or "cells" we have consumed needs to be reported and stored for later
             // when/if we need to erase the command line.
@@ -544,7 +571,7 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
             CursorPosition.X = XPosition;
 
             // enforce a delayed newline if we're about to pass the end and the WC_DELAY_EOL_WRAP flag is set.
-            if (WI_IsFlagSet(dwFlags, WC_DELAY_EOL_WRAP) && CursorPosition.X >= coordScreenBufferSize.X && fWrapAtEOL)
+            if (WI_IsFlagSet(dwFlags, WC_DELAY_EOL_WRAP) && CursorPosition.X >= coordScreenBufferSize.X)
             {
                 // Our cursor position as of this time is going to remain on the last position in this column.
                 CursorPosition.X = coordScreenBufferSize.X - 1;
@@ -613,15 +640,14 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
                 }
 
                 for (i = 0, Tmp2 = buffer.get(), Tmp = pwchBufferBackupLimit;
-                     i < bufferSize;
-                     i++, Tmp++)
+                     i < bufferSize; i++, Tmp++)
                 {
-                    // see 18120085, these two need to be separate if statements
+                    // see 18120085, these two need to be seperate if statements
                     if (*Tmp == UNICODE_BACKSPACE)
                     {
                         //it is important we do nothing in the else case for
                         //      this one instead of falling through to the below else.
-                        if (Tmp2 > buffer.get())
+                        if(Tmp2 > buffer.get())
                         {
                             Tmp2--;
                         }
@@ -638,9 +664,10 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
                 }
                 else
                 {
-#pragma prefast(suppress : 26001, "This is fine. Tmp2 has to have advanced or it would equal pBuffer.")
+#pragma prefast(suppress:26001, "This is fine. Tmp2 has to have advanced or it would equal pBuffer.")
                     LastChar = *(Tmp2 - 1);
                 }
+
 
                 if (LastChar == UNICODE_TAB)
                 {
@@ -713,12 +740,12 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
                 }
                 CATCH_LOG();
             }
-            if (cursor.GetPosition().X == 0 && fWrapAtEOL && pwchBuffer > pwchBufferBackupLimit)
+            if (cursor.GetPosition().X == 0 && (screenInfo.OutputMode & ENABLE_WRAP_AT_EOL_OUTPUT) && pwchBuffer > pwchBufferBackupLimit)
             {
                 if (CheckBisectProcessW(screenInfo,
                                         pwchBufferBackupLimit,
                                         pwchBuffer + 1 - pwchBufferBackupLimit,
-                                        gsl::narrow_cast<size_t>(coordScreenBufferSize.X) - sOriginalXPosition,
+                                        coordScreenBufferSize.X - sOriginalXPosition,
                                         sOriginalXPosition,
                                         dwFlags & WC_ECHO))
                 {
@@ -736,40 +763,54 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
         }
         case UNICODE_TAB:
         {
-            const size_t TabSize = gsl::narrow_cast<size_t>(NUMBER_OF_SPACES_IN_TAB(cursor.GetPosition().X));
-            CursorPosition.X = (SHORT)(cursor.GetPosition().X + TabSize);
-
-            // move cursor forward to next tab stop.  fill space with blanks.
-            // we get here when the tab extends beyond the right edge of the
-            // window.  if the tab goes wraps the line, set the cursor to the first
-            // position in the next line.
-            pwchBuffer++;
-
-            TempNumSpaces += TabSize;
-            size_t NumChars = 0;
-            if (CursorPosition.X >= coordScreenBufferSize.X)
+            // if VT-style tabs are set, then handle them the VT way, including not inserting spaces.
+            // just move the cursor to the next tab stop.
+            if (screenInfo.InVTMode())
             {
-                NumChars = gsl::narrow<size_t>(coordScreenBufferSize.X - cursor.GetPosition().X);
-                CursorPosition.X = 0;
-                CursorPosition.Y = cursor.GetPosition().Y + 1;
-
-                // since you just tabbed yourself past the end of the row, set the wrap
-                textBuffer.GetRowByOffset(cursor.GetPosition().Y).GetCharRow().SetWrapForced(true);
+                const COORD cCursorOld = cursor.GetPosition();
+                // Get Forward tab handles tabbing past the end of the buffer
+                CursorPosition = screenInfo.GetForwardTab(cCursorOld);
             }
             else
             {
-                NumChars = gsl::narrow<size_t>(CursorPosition.X - cursor.GetPosition().X);
-                CursorPosition.Y = cursor.GetPosition().Y;
-            }
+                const size_t TabSize = NUMBER_OF_SPACES_IN_TAB(cursor.GetPosition().X);
+                CursorPosition.X = (SHORT)(cursor.GetPosition().X + TabSize);
 
-            try
-            {
-                const OutputCellIterator it(UNICODE_SPACE, Attributes, NumChars);
-                const auto done = screenInfo.Write(it, cursor.GetPosition());
-                NumChars = done.GetCellDistance(it);
-            }
-            CATCH_LOG();
+                // move cursor forward to next tab stop.  fill space with blanks.
+                // we get here when the tab extends beyond the right edge of the
+                // window.  if the tab goes wraps the line, set the cursor to the first
+                // position in the next line.
+                pwchBuffer++;
 
+                TempNumSpaces += TabSize;
+                size_t NumChars = 0;
+                if (CursorPosition.X >= coordScreenBufferSize.X)
+                {
+                    NumChars = gsl::narrow<size_t>(coordScreenBufferSize.X - cursor.GetPosition().X);
+                    CursorPosition.X = 0;
+                    CursorPosition.Y = cursor.GetPosition().Y + 1;
+
+                    // since you just tabbed yourself past the end of the row, set the wrap
+                    textBuffer.GetRowByOffset(cursor.GetPosition().Y).GetCharRow().SetWrapForced(true);
+                }
+                else
+                {
+                    NumChars = gsl::narrow<size_t>(CursorPosition.X - cursor.GetPosition().X);
+                    CursorPosition.Y = cursor.GetPosition().Y;
+                }
+
+                if (!WI_IsFlagSet(dwFlags, WC_NONDESTRUCTIVE_TAB))
+                {
+                    try
+                    {
+                        const OutputCellIterator it(UNICODE_SPACE, Attributes, NumChars);
+                        const auto done = screenInfo.Write(it, cursor.GetPosition());
+                        NumChars = done.GetCellDistance(it);
+                    }
+                    CATCH_LOG();
+                }
+
+            }
             Status = AdjustCursorPosition(screenInfo, CursorPosition, (dwFlags & WC_KEEP_CURSOR_VISIBLE) != 0, psScrollY);
             break;
         }
@@ -813,7 +854,7 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
             if (Char >= UNICODE_SPACE &&
                 IsGlyphFullWidth(Char) &&
                 XPosition >= (coordScreenBufferSize.X - 1) &&
-                fWrapAtEOL)
+                (screenInfo.OutputMode & ENABLE_WRAP_AT_EOL_OUTPUT))
             {
                 const COORD TargetPoint = cursor.GetPosition();
                 ROW& Row = textBuffer.GetRowByOffset(TargetPoint.Y);
@@ -894,15 +935,16 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
 // Return Value:
 // Note:
 // - This routine does not process tabs and backspace properly.  That code will be implemented as part of the line editing services.
-[[nodiscard]] NTSTATUS WriteChars(SCREEN_INFORMATION& screenInfo,
-                                  _In_range_(<=, pwchBuffer) const wchar_t* const pwchBufferBackupLimit,
-                                  _In_ const wchar_t* pwchBuffer,
-                                  _In_reads_bytes_(*pcb) const wchar_t* pwchRealUnicode,
-                                  _Inout_ size_t* const pcb,
-                                  _Out_opt_ size_t* const pcSpaces,
-                                  const SHORT sOriginalXPosition,
-                                  const DWORD dwFlags,
-                                  _Inout_opt_ PSHORT const psScrollY)
+[[nodiscard]]
+NTSTATUS WriteChars(SCREEN_INFORMATION& screenInfo,
+                    _In_range_(<= , pwchBuffer) const wchar_t* const pwchBufferBackupLimit,
+                    _In_ const wchar_t* pwchBuffer,
+                    _In_reads_bytes_(*pcb) const wchar_t* pwchRealUnicode,
+                    _Inout_ size_t* const pcb,
+                    _Out_opt_ size_t* const pcSpaces,
+                    const SHORT sOriginalXPosition,
+                    const DWORD dwFlags,
+                    _Inout_opt_ PSHORT const psScrollY)
 {
     if (!WI_IsFlagSet(screenInfo.OutputMode, ENABLE_VIRTUAL_TERMINAL_PROCESSING) ||
         !WI_IsFlagSet(screenInfo.OutputMode, ENABLE_PROCESSED_OUTPUT))
@@ -939,7 +981,7 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
                 StateMachine& machine = screenInfo.GetStateMachine();
                 size_t const cch = BufferSize / sizeof(WCHAR);
 
-                machine.ProcessString({ pwchRealUnicode, cch });
+                machine.ProcessString(pwchRealUnicode, cch);
                 *pcb += BufferSize;
             }
         }
@@ -968,11 +1010,11 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
 // - STATUS_SUCCESS if OK.
 // - CONSOLE_STATUS_WAIT if we couldn't finish now and need to be called back later (see ppWaiter).
 // - Or a suitable NTSTATUS format error code for memory/string/math failures.
-[[nodiscard]] NTSTATUS DoWriteConsole(_In_reads_bytes_(*pcbBuffer) PWCHAR pwchBuffer,
-                                      _Inout_ size_t* const pcbBuffer,
-                                      SCREEN_INFORMATION& screenInfo,
-                                      bool requiresVtQuirk,
-                                      std::unique_ptr<WriteData>& waiter)
+[[nodiscard]]
+NTSTATUS DoWriteConsole(_In_reads_bytes_(*pcbBuffer) PWCHAR pwchBuffer,
+                        _Inout_ size_t* const pcbBuffer,
+                        SCREEN_INFORMATION& screenInfo,
+                        std::unique_ptr<WriteData>& waiter)
 {
     const CONSOLE_INFORMATION& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
     if (WI_IsAnyFlagSet(gci.Flags, (CONSOLE_SUSPENDED | CONSOLE_SELECTING | CONSOLE_SCROLLBAR_TRACKING)))
@@ -982,8 +1024,7 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
             waiter = std::make_unique<WriteData>(screenInfo,
                                                  pwchBuffer,
                                                  *pcbBuffer,
-                                                 gci.OutputCP,
-                                                 requiresVtQuirk);
+                                                 gci.OutputCP);
         }
         catch (...)
         {
@@ -991,19 +1032,6 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
         }
 
         return CONSOLE_STATUS_WAIT;
-    }
-
-    auto restoreVtQuirk{
-        wil::scope_exit([&]() { screenInfo.ResetIgnoreLegacyEquivalentVTAttributes(); })
-    };
-
-    if (requiresVtQuirk)
-    {
-        screenInfo.SetIgnoreLegacyEquivalentVTAttributes();
-    }
-    else
-    {
-        restoreVtQuirk.release();
     }
 
     const auto& textBuffer = screenInfo.GetTextBuffer();
@@ -1032,11 +1060,11 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
 // - S_OK if successful.
 // - S_OK if we need to wait (check if ppWaiter is not nullptr).
 // - Or a suitable HRESULT code for math/string/memory failures.
-[[nodiscard]] HRESULT WriteConsoleWImplHelper(IConsoleOutputObject& context,
-                                              const std::wstring_view buffer,
-                                              size_t& read,
-                                              bool requiresVtQuirk,
-                                              std::unique_ptr<WriteData>& waiter) noexcept
+[[nodiscard]]
+HRESULT WriteConsoleWImplHelper(IConsoleOutputObject& context,
+                                const std::wstring_view buffer,
+                                size_t& read,
+                                std::unique_ptr<WriteData>& waiter) noexcept
 {
     try
     {
@@ -1048,7 +1076,7 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
         size_t cbTextBufferLength;
         RETURN_IF_FAILED(SizeTMult(buffer.size(), sizeof(wchar_t), &cbTextBufferLength));
 
-        NTSTATUS Status = DoWriteConsole(const_cast<wchar_t*>(buffer.data()), &cbTextBufferLength, context, requiresVtQuirk, waiter);
+        NTSTATUS Status = DoWriteConsole(const_cast<wchar_t*>(buffer.data()), &cbTextBufferLength, context, waiter);
 
         // Convert back from bytes to characters for the resulting string length written.
         read = cbTextBufferLength / sizeof(wchar_t);
@@ -1078,156 +1106,207 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
 // - S_OK if successful.
 // - S_OK if we need to wait (check if ppWaiter is not nullptr).
 // - Or a suitable HRESULT code for math/string/memory failures.
-[[nodiscard]] HRESULT ApiRoutines::WriteConsoleAImpl(IConsoleOutputObject& context,
-                                                     const std::string_view buffer,
-                                                     size_t& read,
-                                                     bool requiresVtQuirk,
-                                                     std::unique_ptr<IWaitRoutine>& waiter) noexcept
+[[nodiscard]]
+HRESULT ApiRoutines::WriteConsoleAImpl(IConsoleOutputObject& context,
+                                       const std::string_view buffer,
+                                       size_t& read,
+                                       std::unique_ptr<IWaitRoutine>& waiter) noexcept
 {
     try
     {
+        const CONSOLE_INFORMATION& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
         // Ensure output variables are initialized.
         read = 0;
         waiter.reset();
 
-        if (buffer.empty())
+        bool fLeadByteCaptured = false;
+        bool fLeadByteConsumed = false;
+
+        LockConsole();
+        auto Unlock = wil::scope_exit([&] { UnlockConsole(); });
+
+        if (buffer.size() == 0)
         {
             return S_OK;
         }
 
-        LockConsole();
-        auto unlock{ wil::scope_exit([&] { UnlockConsole(); }) };
-
-        auto& screenInfo{ context.GetActiveBuffer() };
-        const auto& consoleInfo{ ServiceLocator::LocateGlobals().getConsoleInformation() };
-        const auto codepage{ consoleInfo.OutputCP };
-        auto leadByteCaptured{ false };
-        auto leadByteConsumed{ false };
-        std::wstring wstr{};
-        static til::u8state u8State{};
+        const auto codepage = gci.OutputCP;
 
         // Convert our input parameters to Unicode
+        std::unique_ptr<wchar_t[]> wideCharBuffer{ nullptr };
+        static Utf8ToWideCharParser parser{ gci.OutputCP };
+
+        // update current codepage in case it was changed from last time
+        // this was called. We do this outside the UTF-8 check because the parser drops its state
+        // when the codepage changes.
+        parser.SetCodePage(gci.OutputCP);
+
+        SCREEN_INFORMATION& ScreenInfo = context.GetActiveBuffer();
+        wchar_t* pwchBuffer;
+        size_t cchBuffer;
         if (codepage == CP_UTF8)
         {
-            RETURN_IF_FAILED(til::u8u16(buffer, wstr, u8State));
-            read = buffer.size();
+            wideCharBuffer.release();
+            unsigned int charCount;
+            unsigned int charsConsumed;
+            unsigned int charsGenerated;
+            RETURN_IF_FAILED(SizeTToUInt(buffer.size(), &charCount));
+            RETURN_IF_FAILED(parser.Parse(reinterpret_cast<const byte*>(buffer.data()),
+                                          charCount,
+                                          charsConsumed,
+                                          wideCharBuffer,
+                                          charsGenerated));
+
+            pwchBuffer = reinterpret_cast<wchar_t*>(wideCharBuffer.get());
+            cchBuffer = charsGenerated;
+            read = charsConsumed;
         }
         else
         {
-            // In case the codepage changes from UTF-8 to another,
-            // we discard partials that might still be cached.
-            u8State.reset();
+            NTSTATUS Status = STATUS_SUCCESS;
+            PWCHAR TransBuffer;
+            PWCHAR TransBufferOriginalLocation;
+            DWORD Length;
+            ULONG dbcsNumBytes = 0;
+            ULONG BufPtrNumBytes = 0;
+            const char* BufPtr = buffer.data();
 
-            int mbPtrLength{};
-            RETURN_IF_FAILED(SizeTToInt(buffer.size(), &mbPtrLength));
+            // (cchTextBufferLength + 2) I think because we might be shoving another unicode char
+            // from ScreenInfo->WriteConsoleDbcsLeadByte in front
+            TransBuffer = new WCHAR[buffer.size() + 2];
+            RETURN_IF_NULL_ALLOC(TransBuffer);
+            ZeroMemory(TransBuffer, sizeof(WCHAR) * (buffer.size() + 2));
 
-            // (buffer.size() + 2) I think because we might be shoving another unicode char
-            // from screenInfo->WriteConsoleDbcsLeadByte in front
-            // because we previously checked that buffer.size() fits into an int, +2 won't cause an overflow of size_t
-            wstr.resize(buffer.size() + 2);
+            TransBufferOriginalLocation = TransBuffer;
 
-            wchar_t* wcPtr{ wstr.data() };
-            auto mbPtr{ buffer.data() };
-            size_t dbcsLength{};
-            if (screenInfo.WriteConsoleDbcsLeadByte[0] != 0 && gsl::narrow_cast<byte>(*mbPtr) >= byte{ ' ' })
+            unsigned int uiTextBufferLength;
+            RETURN_IF_FAILED(SizeTToUInt(buffer.size(), &uiTextBufferLength));
+
+            if (!ScreenInfo.WriteConsoleDbcsLeadByte[0] || *(PUCHAR)BufPtr < (UCHAR) ' ')
+            {
+                dbcsNumBytes = 0;
+                BufPtrNumBytes = uiTextBufferLength;
+            }
+            else if (buffer.size())
             {
                 // there was a portion of a dbcs character stored from a previous
-                // call so we take the 2nd half from mbPtr[0], put them together
-                // and write the wide char to wcPtr[0]
-                screenInfo.WriteConsoleDbcsLeadByte[1] = gsl::narrow_cast<byte>(*mbPtr);
+                // call so we take the 2nd half from BufPtr[0], put them together
+                // and write the wide char to TransBuffer[0]
+                ScreenInfo.WriteConsoleDbcsLeadByte[1] = *(PCHAR)BufPtr;
 
                 try
                 {
-                    const auto wFromComplemented{
-                        ConvertToW(codepage, { reinterpret_cast<const char*>(screenInfo.WriteConsoleDbcsLeadByte), ARRAYSIZE(screenInfo.WriteConsoleDbcsLeadByte) })
-                    };
+                    const std::string_view leadByte(reinterpret_cast<const char* const>(ScreenInfo.WriteConsoleDbcsLeadByte),
+                                                    ARRAYSIZE(ScreenInfo.WriteConsoleDbcsLeadByte));
 
-                    FAIL_FAST_IF(wFromComplemented.size() != 1);
-                    dbcsLength = sizeof(wchar_t);
-                    wcPtr[0] = wFromComplemented.at(0);
-                    mbPtr++;
+                    const std::wstring converted = ConvertToW(gci.OutputCP, leadByte);
+
+                    FAIL_FAST_IF(converted.size() != 1);
+                    dbcsNumBytes = sizeof(wchar_t);
+                    TransBuffer[0] = converted.at(0);
+                    BufPtr++;
                 }
                 catch (...)
                 {
-                    dbcsLength = 0;
+                    Status = STATUS_UNSUCCESSFUL;
+                    dbcsNumBytes = 0;
                 }
 
                 // this looks weird to be always incrementing even if the conversion failed, but this is the
                 // original behavior so it's left unchanged.
-                wcPtr++;
-                mbPtrLength--;
+                TransBuffer++;
+                BufPtrNumBytes = uiTextBufferLength - 1;
 
                 // Note that we used a stored lead byte from a previous call in order to complete this write
                 // Use this to offset the "number of bytes consumed" calculation at the end by -1 to account
                 // for using a byte we had internally, not off the stream.
-                leadByteConsumed = true;
+                fLeadByteConsumed = true;
+            }
+            else
+            {
+                // nothing in ScreenInfo->WriteConsoleDbcsLeadByte and nothing in BufPtr
+                BufPtrNumBytes = 0;
             }
 
-            screenInfo.WriteConsoleDbcsLeadByte[0] = 0;
+            ScreenInfo.WriteConsoleDbcsLeadByte[0] = 0;
 
-            // if the last byte in mbPtr is a lead byte for the current code page,
+            // if the last byte in BufPtr is a lead byte for the current code page,
             // save it for the next time this function is called and we can piece it
             // back together then
-            if (mbPtrLength != 0 && CheckBisectStringA(const_cast<char*>(mbPtr), mbPtrLength, &consoleInfo.OutputCPInfo))
+            __analysis_assume(BufPtrNumBytes <= uiTextBufferLength);
+            if (BufPtrNumBytes && CheckBisectStringA((PCHAR)BufPtr, BufPtrNumBytes, &gci.OutputCPInfo))
             {
-                screenInfo.WriteConsoleDbcsLeadByte[0] = gsl::narrow_cast<byte>(mbPtr[mbPtrLength - 1]);
-                mbPtrLength--;
+                ScreenInfo.WriteConsoleDbcsLeadByte[0] = *((PCHAR)BufPtr + BufPtrNumBytes - 1);
+                BufPtrNumBytes--;
 
                 // Note that we captured a lead byte during this call, but won't actually draw it until later.
                 // Use this to offset the "number of bytes consumed" calculation at the end by +1 to account
                 // for taking a byte off the stream.
-                leadByteCaptured = true;
+                fLeadByteCaptured = true;
             }
 
-            if (mbPtrLength != 0)
+            if (BufPtrNumBytes != 0)
             {
-                // convert the remaining bytes in mbPtr to wide chars
-                mbPtrLength = sizeof(wchar_t) * MultiByteToWideChar(codepage, 0, mbPtr, mbPtrLength, wcPtr, mbPtrLength);
+                // convert the remaining bytes in BufPtr to wide chars
+                Length = sizeof(WCHAR) * MultiByteToWideChar(gci.OutputCP,
+                                                             0,
+                                                             (LPCCH)BufPtr,
+                                                             BufPtrNumBytes,
+                                                             TransBuffer,
+                                                             BufPtrNumBytes);
+
+                if (Length == 0)
+                {
+                    Status = STATUS_UNSUCCESSFUL;
+                }
+                BufPtrNumBytes = Length;
             }
 
-            wstr.resize((dbcsLength + mbPtrLength) / sizeof(wchar_t));
+            pwchBuffer = TransBufferOriginalLocation;
+            cchBuffer = (dbcsNumBytes + BufPtrNumBytes) / sizeof(wchar_t);
         }
 
-        // Hold the specific version of the waiter locally so we can tinker with it if we must to store additional context.
-        std::unique_ptr<WriteData> writeDataWaiter{};
-
         // Make the W version of the call
-        size_t wcBufferWritten{};
-        const auto hr{ WriteConsoleWImplHelper(screenInfo, wstr, wcBufferWritten, requiresVtQuirk, writeDataWaiter) };
+        size_t cchBufferRead;
+
+        // Hold the specific version of the waiter locally so we can tinker with it if we must to store additional context.
+        std::unique_ptr<WriteData> writeDataWaiter;
+
+        HRESULT const hr = WriteConsoleWImplHelper(ScreenInfo, { pwchBuffer, cchBuffer }, cchBufferRead, writeDataWaiter);
 
         // If there is no waiter, process the byte count now.
         if (nullptr == writeDataWaiter.get())
         {
-            // Calculate how many bytes of the original A buffer were consumed in the W version of the call to satisfy mbBufferRead.
+            // Calculate how many bytes of the original A buffer were consumed in the W version of the call to satisfy pcchTextBufferRead.
             // For UTF-8 conversions, we've already returned this information above.
             if (CP_UTF8 != codepage)
             {
-                size_t mbBufferRead{};
+                size_t cchTextBufferRead = 0;
 
                 // Start by counting the number of A bytes we used in printing our W string to the screen.
                 try
                 {
-                    mbBufferRead = GetALengthFromW(codepage, { wstr.data(), wcBufferWritten });
+                    cchTextBufferRead = GetALengthFromW(codepage, { pwchBuffer, cchBufferRead });
                 }
                 CATCH_LOG();
 
                 // If we captured a byte off the string this time around up above, it means we didn't feed
                 // it into the WriteConsoleW above, and therefore its consumption isn't accounted for
                 // in the count we just made. Add +1 to compensate.
-                if (leadByteCaptured)
+                if (fLeadByteCaptured)
                 {
-                    mbBufferRead++;
+                    cchTextBufferRead++;
                 }
 
                 // If we consumed an internally-stored lead byte this time around up above, it means that we
                 // fed a byte into WriteConsoleW that wasn't a part of this particular call's request.
                 // We need to -1 to compensate and tell the caller the right number of bytes consumed this request.
-                if (leadByteConsumed)
+                if (fLeadByteConsumed)
                 {
-                    mbBufferRead--;
+                    cchTextBufferRead--;
                 }
 
-                read = mbBufferRead;
+                read = cchTextBufferRead;
             }
         }
         else
@@ -1238,13 +1317,19 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
             {
                 // For non-UTF8 codepages, save the lead byte captured/consumed data so we can +1 or -1 the final decoded count
                 // in the WaitData::Notify method later.
-                writeDataWaiter->SetLeadByteAdjustmentStatus(leadByteCaptured, leadByteConsumed);
+                writeDataWaiter->SetLeadByteAdjustmentStatus(fLeadByteCaptured, fLeadByteConsumed);
             }
             else
             {
                 // For UTF8 codepages, just remember the consumption count from the UTF-8 parser.
                 writeDataWaiter->SetUtf8ConsumedCharacters(read);
             }
+        }
+
+        // Free remaining data
+        if (codepage != CP_UTF8)
+        {
+            delete[] pwchBuffer;
         }
 
         // Give back the waiter now that we're done with tinkering with it.
@@ -1268,19 +1353,19 @@ constexpr unsigned int LOCAL_BUFFER_SIZE = 100;
 // - S_OK if successful.
 // - S_OK if we need to wait (check if ppWaiter is not nullptr).
 // - Or a suitable HRESULT code for math/string/memory failures.
-[[nodiscard]] HRESULT ApiRoutines::WriteConsoleWImpl(IConsoleOutputObject& context,
-                                                     const std::wstring_view buffer,
-                                                     size_t& read,
-                                                     bool requiresVtQuirk,
-                                                     std::unique_ptr<IWaitRoutine>& waiter) noexcept
+[[nodiscard]]
+HRESULT ApiRoutines::WriteConsoleWImpl(IConsoleOutputObject& context,
+                                       const std::wstring_view buffer,
+                                       size_t& read,
+                                       std::unique_ptr<IWaitRoutine>& waiter) noexcept
 {
     try
     {
         LockConsole();
-        auto unlock = wil::scope_exit([&] { UnlockConsole(); });
+        auto Unlock = wil::scope_exit([&] { UnlockConsole(); });
 
         std::unique_ptr<WriteData> writeDataWaiter;
-        RETURN_IF_FAILED(WriteConsoleWImplHelper(context.GetActiveBuffer(), buffer, read, requiresVtQuirk, writeDataWaiter));
+        RETURN_IF_FAILED(WriteConsoleWImplHelper(context.GetActiveBuffer(), buffer, read, writeDataWaiter));
 
         // Transfer specific waiter pointer into the generic interface wrapper.
         waiter.reset(writeDataWaiter.release());

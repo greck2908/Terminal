@@ -6,51 +6,59 @@
 #include "AttrRowIterator.hpp"
 #include "AttrRow.hpp"
 
-AttrRowIterator AttrRowIterator::CreateEndIterator(const ATTR_ROW* const attrRow) noexcept
+AttrRowIterator AttrRowIterator::CreateEndIterator(const ATTR_ROW* const attrRow)
 {
     AttrRowIterator it{ attrRow };
     it._setToEnd();
     return it;
 }
 
-AttrRowIterator::AttrRowIterator(const ATTR_ROW* const attrRow) noexcept :
+AttrRowIterator::AttrRowIterator(const ATTR_ROW* const attrRow) :
     _pAttrRow{ attrRow },
     _run{ attrRow->_list.cbegin() },
-    _currentAttributeIndex{ 0 },
-    _exceeded{ false }
+    _currentAttributeIndex{ 0 }
 {
 }
 
 AttrRowIterator::operator bool() const noexcept
 {
-    return !_exceeded && _run < _pAttrRow->_list.cend();
+    return _run < _pAttrRow->_list.cend();
 }
 
-bool AttrRowIterator::operator==(const AttrRowIterator& it) const noexcept
+bool AttrRowIterator::operator==(const AttrRowIterator& it) const
 {
     return (_pAttrRow == it._pAttrRow &&
             _run == it._run &&
-            _currentAttributeIndex == it._currentAttributeIndex &&
-            _exceeded == it._exceeded);
+            _currentAttributeIndex == it._currentAttributeIndex);
 }
 
-bool AttrRowIterator::operator!=(const AttrRowIterator& it) const noexcept
+bool AttrRowIterator::operator!=(const AttrRowIterator& it) const
 {
     return !(*this == it);
 }
 
+AttrRowIterator& AttrRowIterator::operator++()
+{
+    _increment(1);
+    return *this;
+}
+
+AttrRowIterator AttrRowIterator::operator++(int)
+{
+    auto copy = *this;
+    _increment(1);
+    return copy;
+}
+
 AttrRowIterator& AttrRowIterator::operator+=(const ptrdiff_t& movement)
 {
-    if (!_exceeded)
+    if (movement >= 0)
     {
-        if (movement >= 0)
-        {
-            _increment(gsl::narrow<size_t>(movement));
-        }
-        else
-        {
-            _decrement(gsl::narrow<size_t>(-movement));
-        }
+        _increment(gsl::narrow<size_t>(movement));
+    }
+    else
+    {
+        _decrement(gsl::narrow<size_t>(-movement));
     }
 
     return *this;
@@ -61,15 +69,26 @@ AttrRowIterator& AttrRowIterator::operator-=(const ptrdiff_t& movement)
     return this->operator+=(-movement);
 }
 
+AttrRowIterator& AttrRowIterator::operator--()
+{
+    _decrement(1);
+    return *this;
+}
+
+AttrRowIterator AttrRowIterator::operator--(int)
+{
+    auto copy = *this;
+    _decrement(1);
+    return copy;
+}
+
 const TextAttribute* AttrRowIterator::operator->() const
 {
-    THROW_HR_IF(E_BOUNDS, _exceeded);
     return &_run->GetAttributes();
 }
 
 const TextAttribute& AttrRowIterator::operator*() const
 {
-    THROW_HR_IF(E_BOUNDS, _exceeded);
     return _run->GetAttributes();
 }
 
@@ -77,7 +96,7 @@ const TextAttribute& AttrRowIterator::operator*() const
 // - increments the index the iterator points to
 // Arguments:
 // - count - the amount to increment by
-void AttrRowIterator::_increment(size_t count) noexcept
+void AttrRowIterator::_increment(size_t count)
 {
     while (count > 0)
     {
@@ -100,27 +119,18 @@ void AttrRowIterator::_increment(size_t count) noexcept
 // - decrements the index the iterator points to
 // Arguments:
 // - count - the amount to decrement by
-void AttrRowIterator::_decrement(size_t count) noexcept
+void AttrRowIterator::_decrement(size_t count)
 {
     while (count > 0)
     {
-        // If there's still space within this color attribute to move left, do so.
         if (count <= _currentAttributeIndex)
         {
             _currentAttributeIndex -= count;
             return;
         }
-        // If there's not space, move to the previous attribute run
-        // We'll walk through above on the if branch to move left further (if necessary)
         else
         {
-            // make sure we don't go out of bounds
-            if (_run == _pAttrRow->_list.cbegin())
-            {
-                _exceeded = true;
-                return;
-            }
-            count -= _currentAttributeIndex + 1;
+            count -= _currentAttributeIndex;
             --_run;
             _currentAttributeIndex = _run->GetLength() - 1;
         }
@@ -129,7 +139,7 @@ void AttrRowIterator::_decrement(size_t count) noexcept
 
 // Routine Description:
 // - sets fields on the iterator to describe the end() state of the ATTR_ROW
-void AttrRowIterator::_setToEnd() noexcept
+void AttrRowIterator::_setToEnd()
 {
     _run = _pAttrRow->_list.cend();
     _currentAttributeIndex = 0;

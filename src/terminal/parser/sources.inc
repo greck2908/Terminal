@@ -35,7 +35,6 @@ SOURCES = \
     ..\OutputStateMachineEngine.cpp \
     ..\telemetry.cpp \
     ..\tracing.cpp \
-    ..\base64.cpp \
 
 INCLUDES = \
     $(INCLUDES); \

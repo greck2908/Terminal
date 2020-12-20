@@ -24,7 +24,8 @@ Revision History:
 
 void ScreenBufferSizeChange(const COORD coordNewSize);
 
-[[nodiscard]] NTSTATUS DoCreateScreenBuffer();
+[[nodiscard]]
+NTSTATUS DoCreateScreenBuffer();
 
 std::vector<WORD> ReadOutputAttributes(const SCREEN_INFORMATION& screenInfo,
                                        const COORD coordRead,
@@ -35,8 +36,8 @@ std::wstring ReadOutputStringW(const SCREEN_INFORMATION& screenInfo,
                                const size_t amountToRead);
 
 std::string ReadOutputStringA(const SCREEN_INFORMATION& screenInfo,
-                              const COORD coordRead,
-                              const size_t amountToRead);
+                                    const COORD coordRead,
+                                    const size_t amountToRead);
 
 void ScrollRegion(SCREEN_INFORMATION& screenInfo,
                   const SMALL_RECT scrollRect,

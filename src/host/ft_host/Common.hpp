@@ -17,7 +17,7 @@ Revision History:
 
 #pragma once
 
-#include "../../inc/consoletaeftemplates.hpp"
+#include "..\..\inc\consoletaeftemplates.hpp"
 
 class Common
 {
@@ -25,7 +25,6 @@ public:
     static bool TestBufferSetup();
     static bool TestBufferCleanup();
     static HANDLE _hConsole;
-    static bool _isV2;
 };
 
 class CommonV1V2Helper
@@ -58,7 +57,11 @@ bool CheckLastError(HRESULT hr, PCWSTR pwszFunc);
 bool CheckLastError(BOOL fSuccess, PCWSTR pwszFunc);
 bool CheckLastError(HANDLE handle, PCWSTR pwszFunc);
 
-[[nodiscard]] bool CheckIfFileExists(_In_ PCWSTR pwszPath) noexcept;
+[[nodiscard]]
+bool CheckIfFileExists(_In_ PCWSTR pwszPath) noexcept;
+
+[[nodiscard]]
+HRESULT ExpandPathToMutable(_In_ PCWSTR pwszPath, _Out_ wistd::unique_ptr<wchar_t[]>& MutablePath) noexcept;
 
 //http://blogs.msdn.com/b/oldnewthing/archive/2013/10/17/10457292.aspx
 BOOL UnadjustWindowRectEx(
@@ -69,5 +72,3 @@ BOOL UnadjustWindowRectEx(
 
 HANDLE GetStdInputHandle();
 HANDLE GetStdOutputHandle();
-
-bool IsConsoleStillRunning();

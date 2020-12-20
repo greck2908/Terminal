@@ -7,14 +7,14 @@
 
 #include "ApiSorter.h"
 
-#include "../host/conserv.h"
-#include "../host/conwinuserrefs.h"
-#include "../host/directio.h"
-#include "../host/handle.h"
-#include "../host/srvinit.h"
-#include "../host/telemetry.hpp"
+#include "..\host\conserv.h"
+#include "..\host\conwinuserrefs.h"
+#include "..\host\directio.h"
+#include "..\host\handle.h"
+#include "..\host\srvinit.h"
+#include "..\host\telemetry.hpp"
 
-#include "../interactivity/inc/ServiceLocator.hpp"
+#include "..\interactivity\inc\ServiceLocator.hpp"
 
 using namespace Microsoft::Console::Interactivity;
 
@@ -26,7 +26,7 @@ using namespace Microsoft::Console::Interactivity;
 //
 // Object Name not found.
 //
-#define STATUS_OBJECT_NAME_NOT_FOUND ((NTSTATUS)0xC0000034L)
+#define STATUS_OBJECT_NAME_NOT_FOUND     ((NTSTATUS)0xC0000034L)
 
 // Routine Description:
 // - This routine handles IO requests to create new objects. It validates the request, creates the object and a "handle" to it.
@@ -49,6 +49,7 @@ PCONSOLE_API_MSG IoDispatchers::ConsoleCreateObject(_In_ PCONSOLE_API_MSG pMessa
         if ((CreateInformation->DesiredAccess & (GENERIC_READ | GENERIC_WRITE)) == GENERIC_READ)
         {
             CreateInformation->ObjectType = CD_IO_OBJECT_TYPE_CURRENT_INPUT;
+
         }
         else if ((CreateInformation->DesiredAccess & (GENERIC_READ | GENERIC_WRITE)) == GENERIC_WRITE)
         {
@@ -89,15 +90,13 @@ PCONSOLE_API_MSG IoDispatchers::ConsoleCreateObject(_In_ PCONSOLE_API_MSG pMessa
         goto Error;
     }
 
-    auto deviceComm{ ServiceLocator::LocateGlobals().pDeviceComm };
-
     // Complete the request.
     pMessage->SetReplyStatus(STATUS_SUCCESS);
-    pMessage->SetReplyInformation(deviceComm->PutHandle(handle.get()));
+    pMessage->SetReplyInformation(reinterpret_cast<ULONG_PTR>(handle.get()));
 
-    if (SUCCEEDED(deviceComm->CompleteIo(&pMessage->Complete)))
+    if (SUCCEEDED(ServiceLocator::LocateGlobals().pDeviceComm->CompleteIo(&pMessage->Complete)))
     {
-        // We've successfully transferred ownership of the handle to the driver. We can release and not free it.
+        // We've successfully transfered ownership of the handle to the driver. We can release and not free it.
         handle.release();
     }
 
@@ -175,7 +174,7 @@ PCONSOLE_API_MSG IoDispatchers::ConsoleHandleConnectionRequest(_In_ PCONSOLE_API
     // ConsoleApp will be false in the AttachConsole case.
     if (Cac.ConsoleApp)
     {
-        LOG_IF_FAILED(ServiceLocator::LocateConsoleControl()->NotifyConsoleApplication(dwProcessId));
+        ServiceLocator::LocateConsoleControl()->NotifyConsoleApplication(dwProcessId);
     }
 
     ServiceLocator::LocateAccessibilityNotifier()->NotifyConsoleStartApplicationEvent(dwProcessId);
@@ -215,6 +214,7 @@ PCONSOLE_API_MSG IoDispatchers::ConsoleHandleConnectionRequest(_In_ PCONSOLE_API
         goto Error;
     }
 
+
     auto& screenInfo = gci.GetActiveOutputBuffer().GetMainBuffer();
     Status = NTSTATUS_FROM_HRESULT(screenInfo.AllocateIoHandle(ConsoleHandleData::HandleType::Output,
                                                                GENERIC_READ | GENERIC_WRITE,
@@ -230,12 +230,11 @@ PCONSOLE_API_MSG IoDispatchers::ConsoleHandleConnectionRequest(_In_ PCONSOLE_API
     pReceiveMsg->SetReplyStatus(STATUS_SUCCESS);
     pReceiveMsg->SetReplyInformation(sizeof(CD_CONNECTION_INFORMATION));
 
-    auto deviceComm{ ServiceLocator::LocateGlobals().pDeviceComm };
-    CD_CONNECTION_INFORMATION ConnectionInformation = ProcessData->GetConnectionInformation(deviceComm);
+    CD_CONNECTION_INFORMATION ConnectionInformation = ProcessData->GetConnectionInformation();
     pReceiveMsg->Complete.Write.Data = &ConnectionInformation;
     pReceiveMsg->Complete.Write.Size = sizeof(CD_CONNECTION_INFORMATION);
 
-    if (FAILED(deviceComm->CompleteIo(&pReceiveMsg->Complete)))
+    if (FAILED(ServiceLocator::LocateGlobals().pDeviceComm->CompleteIo(&pReceiveMsg->Complete)))
     {
         CommandHistory::s_Free((HANDLE)ProcessData);
         gci.ProcessHandleList.FreeProcessData(ProcessData);

@@ -14,14 +14,18 @@ Author(s):
 
 #pragma once
 
-#include "../renderer/inc/IFontDefaultList.hpp"
+#include "..\renderer\inc\IFontDefaultList.hpp"
 
-class RenderFontDefaults sealed : public Microsoft::Console::Render::IFontDefaultList
+using namespace Microsoft::Console::Render;
+
+class RenderFontDefaults sealed : public IFontDefaultList
 {
 public:
     RenderFontDefaults();
     ~RenderFontDefaults();
 
-    [[nodiscard]] HRESULT RetrieveDefaultFontNameForCodepage(const unsigned int codePage,
-                                                             std::wstring& outFaceName);
+    [[nodiscard]]
+    HRESULT RetrieveDefaultFontNameForCodepage(const UINT uiCodePage,
+                                               _Out_writes_(cchFaceName) PWSTR pwszFaceName,
+                                               const size_t cchFaceName);
 };

@@ -9,12 +9,9 @@
 
 #include <functional>
 
-#include "../interactivity/inc/ServiceLocator.hpp"
+#include "..\interactivity\inc\ServiceLocator.hpp"
 
 #define INPUT_BUFFER_DEFAULT_INPUT_MODE (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT | ENABLE_MOUSE_INPUT)
-
-using Microsoft::Console::Interactivity::ServiceLocator;
-using Microsoft::Console::VirtualTerminal::TerminalInput;
 
 // Routine Description:
 // - This method creates an input buffer.
@@ -212,7 +209,8 @@ void InputBuffer::Flush()
 // - The console lock must be held when calling this routine.
 void InputBuffer::FlushAllButKeys()
 {
-    auto newEnd = std::remove_if(_storage.begin(), _storage.end(), [](const std::unique_ptr<IInputEvent>& event) {
+    auto newEnd = std::remove_if(_storage.begin(), _storage.end(), [](const std::unique_ptr<IInputEvent>& event)
+    {
         return event->EventType() != InputEventType::KeyEvent;
     });
     _storage.erase(newEnd, _storage.end());
@@ -235,12 +233,13 @@ void InputBuffer::FlushAllButKeys()
 // - STATUS_SUCCESS if records were read into the client buffer and everything is OK.
 // - CONSOLE_STATUS_WAIT if there weren't enough records to satisfy the request (and waits are allowed)
 // - otherwise a suitable memory/math/string error in NTSTATUS form.
-[[nodiscard]] NTSTATUS InputBuffer::Read(_Out_ std::deque<std::unique_ptr<IInputEvent>>& OutEvents,
-                                         const size_t AmountToRead,
-                                         const bool Peek,
-                                         const bool WaitForData,
-                                         const bool Unicode,
-                                         const bool Stream)
+[[nodiscard]]
+NTSTATUS InputBuffer::Read(_Out_ std::deque<std::unique_ptr<IInputEvent>>& OutEvents,
+                           const size_t AmountToRead,
+                           const bool Peek,
+                           const bool WaitForData,
+                           const bool Unicode,
+                           const bool Stream)
 {
     try
     {
@@ -300,11 +299,12 @@ void InputBuffer::FlushAllButKeys()
 // - STATUS_SUCCESS if records were read into the client buffer and everything is OK.
 // - CONSOLE_STATUS_WAIT if there weren't enough records to satisfy the request (and waits are allowed)
 // - otherwise a suitable memory/math/string error in NTSTATUS form.
-[[nodiscard]] NTSTATUS InputBuffer::Read(_Out_ std::unique_ptr<IInputEvent>& outEvent,
-                                         const bool Peek,
-                                         const bool WaitForData,
-                                         const bool Unicode,
-                                         const bool Stream)
+[[nodiscard]]
+NTSTATUS InputBuffer::Read(_Out_ std::unique_ptr<IInputEvent>& outEvent,
+                           const bool Peek,
+                           const bool WaitForData,
+                           const bool Unicode,
+                           const bool Stream)
 {
     NTSTATUS Status;
     try
@@ -420,7 +420,7 @@ void InputBuffer::_ReadBuffer(_Out_ std::deque<std::unique_ptr<IInputEvent>>& ou
                 readEvents.back()->EventType() == InputEventType::KeyEvent &&
                 _storage.front()->EventType() == InputEventType::KeyEvent &&
                 _CanCoalesce(static_cast<const KeyEvent&>(*readEvents.back()),
-                             static_cast<const KeyEvent&>(*_storage.front())))
+                                static_cast<const KeyEvent&>(*_storage.front())))
             {
                 KeyEvent& keyEvent = static_cast<KeyEvent&>(*_storage.front());
                 keyEvent.SetRepeatCount(keyEvent.GetRepeatCount() + 1);
@@ -466,8 +466,6 @@ size_t InputBuffer::Prepend(_Inout_ std::deque<std::unique_ptr<IInputEvent>>& in
 {
     try
     {
-        _vtInputShouldSuppress = true;
-        auto resetVtInputSuppress = wil::scope_exit([&]() { _vtInputShouldSuppress = false; });
         _HandleConsoleSuspensionEvents(inEvents);
         if (inEvents.empty())
         {
@@ -558,8 +556,6 @@ size_t InputBuffer::Write(_Inout_ std::deque<std::unique_ptr<IInputEvent>>& inEv
 {
     try
     {
-        _vtInputShouldSuppress = true;
-        auto resetVtInputSuppress = wil::scope_exit([&]() { _vtInputShouldSuppress = false; });
         _HandleConsoleSuspensionEvents(inEvents);
         if (inEvents.empty())
         {
@@ -609,7 +605,7 @@ void InputBuffer::_WriteBuffer(_Inout_ std::deque<std::unique_ptr<IInputEvent>>&
     const size_t initialInEventsSize = inEvents.size();
     const bool vtInputMode = IsInVirtualTerminalInputMode();
 
-    while (!inEvents.empty())
+    while(!inEvents.empty())
     {
         // Pop the next event.
         // If we're in vt mode, try and handle it with the vt input module.
@@ -720,7 +716,7 @@ bool InputBuffer::_CoalesceMouseMovedEvents(_Inout_ std::deque<std::unique_ptr<I
 }
 
 // Routine Description:
-// - checks two KeyEvents to see if they're similar enough to be coalesced
+// - checks two KeyEvents to see if they're similiar enough to be coalesced
 // Arguments:
 // - a - the first KeyEvent
 // - b - the other KeyEvent
@@ -736,8 +732,8 @@ bool InputBuffer::_CanCoalesce(const KeyEvent& a, const KeyEvent& b) const noexc
     }
     // other key events check
     else if (a.GetVirtualScanCode() == b.GetVirtualScanCode() &&
-             a.GetCharData() == b.GetCharData() &&
-             a.GetActiveModifierKeys() == b.GetActiveModifierKeys())
+                a.GetCharData() == b.GetCharData() &&
+                a.GetActiveModifierKeys() == b.GetActiveModifierKeys())
     {
         return true;
     }
@@ -845,7 +841,8 @@ bool InputBuffer::IsInVirtualTerminalInputMode() const
 // - Handler for inserting key sequences into the buffer when the terminal emulation layer
 //   has determined a key can be converted appropriately into a sequence of inputs
 // Arguments:
-// - inEvents - Series of input records to insert into the buffer
+// - rgInput - Series of input records to insert into the buffer
+// - cInput - Length of input records array
 // Return Value:
 // - <none>
 void InputBuffer::_HandleTerminalInputCallback(std::deque<std::unique_ptr<IInputEvent>>& inEvents)
@@ -858,12 +855,6 @@ void InputBuffer::_HandleTerminalInputCallback(std::deque<std::unique_ptr<IInput
             std::unique_ptr<IInputEvent> inEvent = std::move(inEvents.front());
             inEvents.pop_front();
             _storage.push_back(std::move(inEvent));
-        }
-
-        if (!_vtInputShouldSuppress)
-        {
-            ServiceLocator::LocateGlobals().hInputEvent.SetEvent();
-            WakeUpReadersWaitingForData();
         }
     }
     catch (...)

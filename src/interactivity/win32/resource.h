@@ -15,8 +15,6 @@ Author(s):
 
 #pragma once
 
-// clang-format off
-
 // IDs of various STRINGTABLE entries
 #define ID_CONSOLE_MSGCMDLINEF2          0x1008
 #define ID_CONSOLE_MSGCMDLINEF4          0x1009
@@ -47,5 +45,3 @@ Author(s):
 #define ID_CONSOLE_FINDCASE     602
 #define ID_CONSOLE_FINDUP       603
 #define ID_CONSOLE_FINDDOWN     604
-
-// clang-format on

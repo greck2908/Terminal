@@ -11,7 +11,8 @@ using namespace std;
 using namespace Windows::Internal;
 
 #define CONSOLE_WINDOW_FLAGS (WS_OVERLAPPEDWINDOW | WS_HSCROLL | WS_VSCROLL)
-#define CONSOLE_WINDOW_EX_FLAGS (WS_EX_WINDOWEDGE | WS_EX_ACCEPTFILES | WS_EX_APPWINDOW)
+#define CONSOLE_WINDOW_EX_FLAGS (WS_EX_WINDOWEDGE | WS_EX_ACCEPTFILES | WS_EX_APPWINDOW )
+
 
 void PrintRect(LPCWSTR pwszLabel, RECT& rc)
 {
@@ -72,10 +73,10 @@ HRESULT PrintMonitorInfo(LPCWSTR pwszLabel, HMONITOR hmon)
 
 BOOL CALLBACK MonitorEnumProc(
     _In_ HMONITOR hMonitor,
-    _In_ HDC /*hdcMonitor*/,
-    _In_ LPRECT /*lprcMonitor*/,
-    _In_ LPARAM /*dwData*/
-)
+    _In_ HDC      /*hdcMonitor*/,
+    _In_ LPRECT   /*lprcMonitor*/,
+    _In_ LPARAM   /*dwData*/
+    )
 {
     PrintMonitorInfo(L"--- Monitor ---", hMonitor);
     wcout << endl;
@@ -128,12 +129,12 @@ int __cdecl wmain(int /*argc*/, WCHAR* /*argv*/[])
     SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
 
     HANDLE hOut = CreateFileW(L"CONOUT$",
-                              GENERIC_READ | GENERIC_WRITE,
-                              FILE_SHARE_WRITE,
-                              0,
-                              OPEN_EXISTING,
-                              0,
-                              0);
+                                GENERIC_READ | GENERIC_WRITE,
+                                FILE_SHARE_WRITE,
+                                0,
+                                OPEN_EXISTING,
+                                0,
+                                0);
 
     RETURN_IF_HANDLE_INVALID(hOut);
 
@@ -176,12 +177,19 @@ int __cdecl wmain(int /*argc*/, WCHAR* /*argv*/[])
     PrintSize(L"Scroll Bar Reservations (unscaled):", sz);
 
     HMODULE hUser32 = LoadLibraryW(L"user32.dll");
-    typedef int (*PfnGetDpiMetrics)(int nIndex, int dpi);
+    typedef int(*PfnGetDpiMetrics)(int nIndex, int dpi);
     bool fGotMetrics = false;
 
     if (hUser32 != nullptr)
     {
-        pfn = (PfnGetDpiMetrics)GetProcAddress(hUser32, "GetSystemMetricsForDpi");
+        // First try the TH1/TH2 name of the function.
+        PfnGetDpiMetrics pfn = (PfnGetDpiMetrics)GetProcAddress(hUser32, "GetDpiMetrics");
+
+        if (pfn == nullptr)
+        {
+            // If not, then try the RS1 name of the function.
+            pfn = (PfnGetDpiMetrics)GetProcAddress(hUser32, "GetSystemMetricsForDpi");
+        }
 
         if (pfn != nullptr)
         {
@@ -189,6 +197,7 @@ int __cdecl wmain(int /*argc*/, WCHAR* /*argv*/[])
             sz.cy = (SHORT)pfn(SM_CYHSCROLL, dpiy);
             fGotMetrics = true;
         }
+
     }
 
     if (!fGotMetrics)
@@ -215,7 +224,9 @@ int __cdecl wmain(int /*argc*/, WCHAR* /*argv*/[])
     CONSOLE_SCREEN_BUFFER_INFOEX csbiex = { 0 };
     csbiex.cbSize = sizeof(csbiex);
 
-    if (!GetConsoleScreenBufferInfoEx(hOut, &csbiex))
+    BOOL b = GetConsoleScreenBufferInfoEx(hOut, &csbiex);
+
+    if (b == FALSE)
     {
         wcout << GetLastError() << endl;
     }
@@ -245,8 +256,7 @@ int __cdecl wmain(int /*argc*/, WCHAR* /*argv*/[])
         bool fHorizScroll = (csbiex.dwSize.X > (szClient.cx / szFontScaled.cx));
         bool fVertScroll = (csbiex.dwSize.Y > (szClient.cy / szFontScaled.cy));
 
-        wcout << "Start with adjusted window dimensions (scaled for DPI). We take the outer window rect and ask the system to scale it down to what we could use for a client." << endl
-              << endl;
+        wcout << "Start with adjusted window dimensions (scaled for DPI). We take the outer window rect and ask the system to scale it down to what we could use for a client." << endl << endl;
         wcout << "Width: " << endl;
         wcout << " Window Adjusted: " << szClient.cx << endl;
         wcout << " / Font         : " << szFontScaled.cx << endl;
@@ -286,8 +296,7 @@ int __cdecl wmain(int /*argc*/, WCHAR* /*argv*/[])
         szCharLeftoverFinal.cx = szAvailableClient.cx % szFontScaled.cx;
         szCharLeftoverFinal.cy = szAvailableClient.cy % szFontScaled.cy;
 
-        wcout << "Now math out the space we actually have for the viewport with scroll bars if necessary." << endl
-              << endl;
+        wcout << "Now math out the space we actually have for the viewport with scroll bars if necessary." << endl << endl;
         wcout << "Width: " << endl;
         wcout << " Window Adjusted: " << szClient.cx << endl;
         wcout << " - Vert Scroll  : " << szRemoveBars.cx << endl;

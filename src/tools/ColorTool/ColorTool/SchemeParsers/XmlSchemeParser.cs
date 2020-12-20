@@ -4,6 +4,7 @@
 //
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -12,7 +13,7 @@ using static ColorTool.ConsoleAPI;
 
 namespace ColorTool.SchemeParsers
 {
-    class XmlSchemeParser : SchemeParserBase
+    class XmlSchemeParser : ISchemeParser
     {
         // In Windows Color Table order
         private static readonly string[] PListColorNames =
@@ -40,12 +41,14 @@ namespace ColorTool.SchemeParsers
         private const string RedKey = "Red Component";
         private const string GreenKey = "Green Component";
         private const string BlueKey = "Blue Component";
+        private const string FileExtension = ".itermcolors";
 
-        public override string FileExtension { get; } = ".itermcolors";
+        public string Name { get; } = "iTerm Parser";
 
-        public override string Name { get; } = "iTerm Parser";
+        public bool CanParse(string schemeName) => 
+            string.Equals(Path.GetExtension(schemeName), FileExtension, StringComparison.OrdinalIgnoreCase);
 
-        public override ColorScheme ParseScheme(string schemeName, bool reportErrors = false)
+        public ColorScheme ParseScheme(string schemeName, bool reportErrors = false)
         {
             XmlDocument xmlDoc = LoadXmlScheme(schemeName); // Create an XML document object
             if (xmlDoc == null) return null;
@@ -82,7 +85,7 @@ namespace ColorTool.SchemeParsers
             }
 
             var consoleAttributes = new ConsoleAttributes(bgColor, fgColor, null, null);
-            return new ColorScheme(ExtractSchemeName(schemeName), colorTable, consoleAttributes);
+            return new ColorScheme(colorTable, consoleAttributes);
         }
 
         private static bool ParseRgbFromXml(XmlNode components, ref uint rgb)
@@ -122,28 +125,23 @@ namespace ColorTool.SchemeParsers
             return true;
         }
 
-        private XmlDocument LoadXmlScheme(string schemeName) =>
-            SchemeManager
-            .GetSearchPaths(schemeName, FileExtension)
-            .Select(path =>
+        private static XmlDocument LoadXmlScheme(string schemeName)
+        {
+            XmlDocument xmlDoc = new XmlDocument(); // Create an XML document object
+            foreach (string path in SchemeManager.GetSearchPaths(schemeName, FileExtension)
+                                          .Where(File.Exists))
+            {
+                try
                 {
-                    try
-                    {
-                        var text = File.ReadAllText(path);
-                        var xmlDoc = new XmlDocument();
-                        xmlDoc.LoadXml(text);
-                        return xmlDoc;
-                    }
-                    catch (XmlException) { }
-                    catch (IOException) { }
-                    catch (UnauthorizedAccessException) { }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine($"Unexpected Exception: {e}.\nBailing...");
-                        throw;
-                    }
-                    return null;
-                })
-            .FirstOrDefault(x => x != null);
+                    xmlDoc.Load(path);
+                    return xmlDoc;
+                }
+                catch (XmlException /*e*/) { /* failed to parse */ }
+                catch (IOException /*e*/) { /* failed to find */ }
+                catch (UnauthorizedAccessException /*e*/) { /* unauthorized */ }
+            }
+
+            return null;
+        }
     }
 }

@@ -13,12 +13,12 @@ Author:
 
 #pragma once
 
-#include <wil/common.h>
-#include <wil/resource.h>
+#include <wil\common.h>
+#include <wil\resource.h>
 
 #ifndef ALTNUMPAD_BIT
 // from winconp.h
-#define ALTNUMPAD_BIT 0x04000000 // AltNumpad OEM char (copied from ntuser/inc/kbd.h)
+#define ALTNUMPAD_BIT         0x04000000 // AltNumpad OEM char (copied from ntuser\inc\kbd.h)
 #endif
 
 #include <wtypes.h>
@@ -50,8 +50,8 @@ public:
     IInputEvent() = default;
     IInputEvent(const IInputEvent&) = default;
     IInputEvent(IInputEvent&&) = default;
-    IInputEvent& operator=(const IInputEvent&) & = default;
-    IInputEvent& operator=(IInputEvent&&) & = default;
+    IInputEvent& operator=(const IInputEvent&)& = default;
+    IInputEvent& operator=(IInputEvent&&)& = default;
 
     virtual INPUT_RECORD ToInputRecord() const noexcept = 0;
 
@@ -64,15 +64,16 @@ public:
 
 inline IInputEvent::~IInputEvent()
 {
+
 }
 
 #ifdef UNIT_TESTING
 std::wostream& operator<<(std::wostream& stream, const IInputEvent* pEvent);
 #endif
 
-#define ALT_PRESSED (RIGHT_ALT_PRESSED | LEFT_ALT_PRESSED)
-#define CTRL_PRESSED (RIGHT_CTRL_PRESSED | LEFT_CTRL_PRESSED)
-#define MOD_PRESSED (SHIFT_PRESSED | ALT_PRESSED | CTRL_PRESSED)
+#define ALT_PRESSED     (RIGHT_ALT_PRESSED | LEFT_ALT_PRESSED)
+#define CTRL_PRESSED    (RIGHT_CTRL_PRESSED | LEFT_CTRL_PRESSED)
+#define MOD_PRESSED     (SHIFT_PRESSED | ALT_PRESSED | CTRL_PRESSED)
 
 // Note taken from VkKeyScan docs (https://msdn.microsoft.com/en-us/library/windows/desktop/ms646329(v=vs.85).aspx):
 // For keyboard layouts that use the right-hand ALT key as a shift key
@@ -120,28 +121,6 @@ DWORD ToConsoleControlKeyFlag(const ModifierKeyState modifierKey) noexcept;
 class KeyEvent : public IInputEvent
 {
 public:
-    enum class Modifiers : DWORD
-    {
-        None = 0,
-        RightAlt = RIGHT_ALT_PRESSED,
-        LeftAlt = LEFT_ALT_PRESSED,
-        RightCtrl = RIGHT_CTRL_PRESSED,
-        LeftCtrl = LEFT_CTRL_PRESSED,
-        Shift = SHIFT_PRESSED,
-        NumLock = NUMLOCK_ON,
-        ScrollLock = SCROLLLOCK_ON,
-        CapsLock = CAPSLOCK_ON,
-        EnhancedKey = ENHANCED_KEY,
-        DbcsChar = NLS_DBCSCHAR,
-        Alphanumeric = NLS_ALPHANUMERIC,
-        Katakana = NLS_KATAKANA,
-        Hiragana = NLS_HIRAGANA,
-        Roman = NLS_ROMAN,
-        ImeConvert = NLS_IME_CONVERSION,
-        AltNumpad = ALTNUMPAD_BIT,
-        ImeDisable = NLS_IME_DISABLE
-    };
-
     constexpr KeyEvent(const KEY_EVENT_RECORD& record) :
         _keyDown{ !!record.bKeyDown },
         _repeatCount{ record.wRepeatCount },
@@ -172,74 +151,44 @@ public:
         _repeatCount{ 0 },
         _virtualKeyCode{ 0 },
         _virtualScanCode{ 0 },
-        _charData{ 0 },
+        _charData { 0 },
         _activeModifierKeys{ 0 }
     {
-    }
-
-    static std::pair<KeyEvent, KeyEvent> MakePair(
-        const WORD repeatCount,
-        const WORD virtualKeyCode,
-        const WORD virtualScanCode,
-        const wchar_t charData,
-        const DWORD activeModifierKeys)
-    {
-        return std::make_pair<KeyEvent, KeyEvent>(
-            { true,
-              repeatCount,
-              virtualKeyCode,
-              virtualScanCode,
-              charData,
-              activeModifierKeys },
-            { false,
-              repeatCount,
-              virtualKeyCode,
-              virtualScanCode,
-              charData,
-              activeModifierKeys });
     }
 
     ~KeyEvent();
     KeyEvent(const KeyEvent&) = default;
     KeyEvent(KeyEvent&&) = default;
-// For these two operators, there seems to be a bug in the compiler:
-// See https://stackoverflow.com/a/60206505/1481137
-//   > C.128 applies only to virtual member functions, but operator= is not
-//   > virtual in your base class and neither does it have the same signature as
-//   > in the derived class, so there is no reason for it to apply.
-#pragma warning(push)
-#pragma warning(disable : 26456)
-    KeyEvent& operator=(const KeyEvent&) & = default;
-    KeyEvent& operator=(KeyEvent&&) & = default;
-#pragma warning(pop)
+    KeyEvent& operator=(const KeyEvent&)& = default;
+    KeyEvent& operator=(KeyEvent&&)& = default;
 
     INPUT_RECORD ToInputRecord() const noexcept override;
     InputEventType EventType() const noexcept override;
 
     constexpr bool IsShiftPressed() const noexcept
     {
-        return WI_IsFlagSet(GetActiveModifierKeys(), SHIFT_PRESSED);
+        return WI_IsFlagSet(_activeModifierKeys, SHIFT_PRESSED);
     }
 
     constexpr bool IsAltPressed() const noexcept
     {
-        return WI_IsAnyFlagSet(GetActiveModifierKeys(), ALT_PRESSED);
+        return WI_IsAnyFlagSet(_activeModifierKeys, ALT_PRESSED);
     }
 
     constexpr bool IsCtrlPressed() const noexcept
     {
-        return WI_IsAnyFlagSet(GetActiveModifierKeys(), CTRL_PRESSED);
+        return WI_IsAnyFlagSet(_activeModifierKeys, CTRL_PRESSED);
     }
 
     constexpr bool IsAltGrPressed() const noexcept
     {
-        return WI_IsFlagSet(GetActiveModifierKeys(), LEFT_CTRL_PRESSED) &&
-               WI_IsFlagSet(GetActiveModifierKeys(), RIGHT_ALT_PRESSED);
+        return WI_IsFlagSet(_activeModifierKeys, LEFT_CTRL_PRESSED) &&
+               WI_IsFlagSet(_activeModifierKeys, RIGHT_ALT_PRESSED);
     }
 
     constexpr bool IsModifierPressed() const noexcept
     {
-        return WI_IsAnyFlagSet(GetActiveModifierKeys(), MOD_PRESSED);
+        return WI_IsAnyFlagSet(_activeModifierKeys, MOD_PRESSED);
     }
 
     constexpr bool IsCursorKey() const noexcept
@@ -250,7 +199,7 @@ public:
 
     constexpr bool IsAltNumpadSet() const noexcept
     {
-        return WI_IsFlagSet(GetActiveModifierKeys(), ALTNUMPAD_BIT);
+        return WI_IsFlagSet(_activeModifierKeys, ALTNUMPAD_BIT);
     }
 
     constexpr bool IsKeyDown() const noexcept
@@ -285,7 +234,7 @@ public:
 
     constexpr DWORD GetActiveModifierKeys() const noexcept
     {
-        return static_cast<DWORD>(_activeModifierKeys);
+        return _activeModifierKeys;
     }
 
     void SetKeyDown(const bool keyDown) noexcept;
@@ -301,36 +250,13 @@ public:
     bool IsCommandLineEditingKey() const noexcept;
     bool IsPopupKey() const noexcept;
 
-    // Function Description:
-    // - Returns true if the given VKey represents a modifier key - shift, alt,
-    //   control or the Win key.
-    // Arguments:
-    // - vkey: the VKEY to check
-    // Return Value:
-    // - true iff the key is a modifier key.
-    constexpr static bool IsModifierKey(const WORD vkey)
-    {
-        return (vkey == VK_CONTROL) ||
-               (vkey == VK_LCONTROL) ||
-               (vkey == VK_RCONTROL) ||
-               (vkey == VK_MENU) ||
-               (vkey == VK_LMENU) ||
-               (vkey == VK_RMENU) ||
-               (vkey == VK_SHIFT) ||
-               (vkey == VK_LSHIFT) ||
-               (vkey == VK_RSHIFT) ||
-               // There is no VK_WIN
-               (vkey == VK_LWIN) ||
-               (vkey == VK_RWIN);
-    };
-
 private:
     bool _keyDown;
     WORD _repeatCount;
     WORD _virtualKeyCode;
     WORD _virtualScanCode;
     wchar_t _charData;
-    Modifiers _activeModifierKeys;
+    DWORD _activeModifierKeys;
 
     friend constexpr bool operator==(const KeyEvent& a, const KeyEvent& b) noexcept;
 #ifdef UNIT_TESTING
@@ -377,8 +303,8 @@ public:
     ~MouseEvent();
     MouseEvent(const MouseEvent&) = default;
     MouseEvent(MouseEvent&&) = default;
-    MouseEvent& operator=(const MouseEvent&) & = default;
-    MouseEvent& operator=(MouseEvent&&) & = default;
+    MouseEvent& operator=(const MouseEvent&)& = default;
+    MouseEvent& operator=(MouseEvent&&)& = default;
 
     INPUT_RECORD ToInputRecord() const noexcept override;
     InputEventType EventType() const noexcept override;
@@ -444,8 +370,8 @@ public:
     ~WindowBufferSizeEvent();
     WindowBufferSizeEvent(const WindowBufferSizeEvent&) = default;
     WindowBufferSizeEvent(WindowBufferSizeEvent&&) = default;
-    WindowBufferSizeEvent& operator=(const WindowBufferSizeEvent&) & = default;
-    WindowBufferSizeEvent& operator=(WindowBufferSizeEvent&&) & = default;
+    WindowBufferSizeEvent& operator=(const WindowBufferSizeEvent&)& = default;
+    WindowBufferSizeEvent& operator=(WindowBufferSizeEvent&&)& = default;
 
     INPUT_RECORD ToInputRecord() const noexcept override;
     InputEventType EventType() const noexcept override;
@@ -485,8 +411,8 @@ public:
     ~MenuEvent();
     MenuEvent(const MenuEvent&) = default;
     MenuEvent(MenuEvent&&) = default;
-    MenuEvent& operator=(const MenuEvent&) & = default;
-    MenuEvent& operator=(MenuEvent&&) & = default;
+    MenuEvent& operator=(const MenuEvent&)& = default;
+    MenuEvent& operator=(MenuEvent&&)& = default;
 
     INPUT_RECORD ToInputRecord() const noexcept override;
     InputEventType EventType() const noexcept override;
@@ -526,8 +452,8 @@ public:
     ~FocusEvent();
     FocusEvent(const FocusEvent&) = default;
     FocusEvent(FocusEvent&&) = default;
-    FocusEvent& operator=(const FocusEvent&) & = default;
-    FocusEvent& operator=(FocusEvent&&) & = default;
+    FocusEvent& operator=(const FocusEvent&)& = default;
+    FocusEvent& operator=(FocusEvent&&)& = default;
 
     INPUT_RECORD ToInputRecord() const noexcept override;
     InputEventType EventType() const noexcept override;

@@ -7,8 +7,8 @@
 
 #include "output.h"
 #include "handle.h"
-#include "../interactivity/inc/ServiceLocator.hpp"
-#include "../terminal/adapter/DispatchCommon.hpp"
+#include "..\interactivity\inc\ServiceLocator.hpp"
+#include "..\terminal\adapter\DispatchCommon.hpp"
 
 #define PTY_SIGNAL_RESIZE_WINDOW 8u
 
@@ -20,7 +20,6 @@ struct PTY_SIGNAL_RESIZE
 
 using namespace Microsoft::Console;
 using namespace Microsoft::Console::Interactivity;
-using namespace Microsoft::Console::VirtualTerminal;
 
 // Constructor Description:
 // - Creates the PTY Signal Input Thread.
@@ -34,7 +33,7 @@ PtySignalInputThread::PtySignalInputThread(_In_ wil::unique_hfile hPipe) :
     _consoleConnected{ false }
 {
     THROW_HR_IF(E_HANDLE, _hFile.get() == INVALID_HANDLE_VALUE);
-    THROW_HR_IF_NULL(E_INVALIDARG, _pConApi.get());
+    THROW_IF_NULL_ALLOC(_pConApi.get());
 }
 
 PtySignalInputThread::~PtySignalInputThread()
@@ -52,7 +51,7 @@ PtySignalInputThread::~PtySignalInputThread()
 // - lpParameter - A pointer to the PtySignalInputTHread instance that should be called.
 // Return Value:
 // - The return value of the underlying instance's _InputThread
-DWORD WINAPI PtySignalInputThread::StaticThreadProc(_In_ LPVOID lpParameter)
+DWORD PtySignalInputThread::StaticThreadProc(_In_ LPVOID lpParameter)
 {
     PtySignalInputThread* const pInstance = reinterpret_cast<PtySignalInputThread*>(lpParameter);
     return pInstance->_InputThread();
@@ -60,7 +59,7 @@ DWORD WINAPI PtySignalInputThread::StaticThreadProc(_In_ LPVOID lpParameter)
 
 // Method Description:
 // - Tell us that there's a client attached to the console, so we can actually
-//      do something with the messages we receive now. Before this is set, there
+//      do something with the messages we recieve now. Before this is set, there
 //      is no guarantee that a client has attached, so most parts of the console
 //      (in and screen buffers) haven't yet been initialized.
 // Arguments:
@@ -77,7 +76,8 @@ void PtySignalInputThread::ConnectConsole() noexcept
 // Return Value:
 // - S_OK if the thread runs to completion.
 // - Otherwise it may cause an application termination another route and never return.
-[[nodiscard]] HRESULT PtySignalInputThread::_InputThread()
+[[nodiscard]]
+HRESULT PtySignalInputThread::_InputThread()
 {
     unsigned short signalId;
     while (_GetData(&signalId, sizeof(signalId)))
@@ -101,7 +101,7 @@ void PtySignalInputThread::ConnectConsole() noexcept
                     SUCCEEDED(UShortToShort(resizeMsg.sy, &sRows)) &&
                     (sColumns > 0 && sRows > 0))
                 {
-                    ServiceLocator::LocateGlobals().launchArgs.SetExpectedSize({ sColumns, sRows });
+                    ServiceLocator::LocateGlobals().launchArgs.SetExpectedSize({sColumns, sRows});
                 }
                 break;
             }
@@ -164,7 +164,8 @@ bool PtySignalInputThread::_GetData(_Out_writes_bytes_(cbBuffer) void* const pBu
 
 // Method Description:
 // - Starts the PTY Signal input thread.
-[[nodiscard]] HRESULT PtySignalInputThread::Start() noexcept
+[[nodiscard]]
+HRESULT PtySignalInputThread::Start() noexcept
 {
     RETURN_LAST_ERROR_IF(!_hFile);
 
@@ -174,12 +175,12 @@ bool PtySignalInputThread::_GetData(_Out_writes_bytes_(cbBuffer) void* const pBu
 
     hThread = CreateThread(nullptr,
                            0,
-                           PtySignalInputThread::StaticThreadProc,
+                           (LPTHREAD_START_ROUTINE)PtySignalInputThread::StaticThreadProc,
                            this,
                            0,
                            &dwThreadId);
 
-    RETURN_LAST_ERROR_IF_NULL(hThread);
+    RETURN_LAST_ERROR_IF(hThread == INVALID_HANDLE_VALUE);
     _hThread.reset(hThread);
     _dwThreadId = dwThreadId;
 

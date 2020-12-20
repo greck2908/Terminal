@@ -13,7 +13,6 @@
 #pragma hdrstop
 
 using namespace Microsoft::Console::Types;
-using Microsoft::Console::Interactivity::ServiceLocator;
 
 ConversionAreaBufferInfo::ConversionAreaBufferInfo(const COORD coordBufferSize) :
     coordCaBuffer(coordBufferSize),
@@ -24,8 +23,8 @@ ConversionAreaBufferInfo::ConversionAreaBufferInfo(const COORD coordBufferSize) 
 
 ConversionAreaInfo::ConversionAreaInfo(const COORD bufferSize,
                                        const COORD windowSize,
-                                       const TextAttribute& fill,
-                                       const TextAttribute& popupFill,
+                                       const CHAR_INFO fill,
+                                       const CHAR_INFO popupFill,
                                        const FontInfo fontInfo) :
     _caInfo{ bufferSize },
     _isHidden{ true },
@@ -37,8 +36,8 @@ ConversionAreaInfo::ConversionAreaInfo(const COORD bufferSize,
     THROW_IF_NTSTATUS_FAILED(SCREEN_INFORMATION::CreateInstance(windowSize,
                                                                 fontInfo,
                                                                 bufferSize,
-                                                                fill,
-                                                                popupFill,
+                                                                { fill.Attributes },
+                                                                { popupFill.Attributes },
                                                                 0,
                                                                 &pNewScreen));
 
@@ -112,7 +111,7 @@ void ConversionAreaInfo::SetAttributes(const TextAttribute& attr)
 void ConversionAreaInfo::WriteText(const std::vector<OutputCell>& text,
                                    const SHORT column)
 {
-    gsl::span<const OutputCell> view(text.data(), text.size());
+    std::basic_string_view<OutputCell> view(text.data(), text.size());
     _screenBuffer->Write(view, { column, 0 });
 }
 
@@ -131,7 +130,8 @@ void ConversionAreaInfo::ClearArea() noexcept
     Paint();
 }
 
-[[nodiscard]] HRESULT ConversionAreaInfo::Resize(const COORD newSize) noexcept
+[[nodiscard]]
+HRESULT ConversionAreaInfo::Resize(const COORD newSize) noexcept
 {
     // attempt to resize underlying buffers
     RETURN_IF_NTSTATUS_FAILED(_screenBuffer->ResizeScreenBuffer(newSize, FALSE));
@@ -148,6 +148,7 @@ void ConversionAreaInfo::ClearArea() noexcept
 
     return S_OK;
 }
+
 
 void ConversionAreaInfo::SetWindowInfo(const SMALL_RECT view) noexcept
 {
@@ -182,7 +183,7 @@ void ConversionAreaInfo::SetViewPos(const COORD pos) noexcept
     {
         CONSOLE_INFORMATION& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
 
-        SMALL_RECT OldRegion = _caInfo.rcViewCaWindow;
+        SMALL_RECT OldRegion = _caInfo.rcViewCaWindow;;
         OldRegion.Left += _caInfo.coordConView.X;
         OldRegion.Right += _caInfo.coordConView.X;
         OldRegion.Top += _caInfo.coordConView.Y;

@@ -40,6 +40,7 @@ SOURCES= \
     ..\RowCellIterator.cpp \
     ..\TextColor.cpp \
     ..\TextAttribute.cpp \
+    ..\TextAttributeRun.cpp \
     ..\textBuffer.cpp \
     ..\textBufferCellIterator.cpp \
     ..\textBufferTextIterator.cpp \
@@ -47,7 +48,6 @@ SOURCES= \
     ..\CharRowCell.cpp \
     ..\CharRowCellReference.cpp \
     ..\UnicodeStorage.cpp \
-	..\search.cpp \
 
 INCLUDES= \
     $(INCLUDES); \

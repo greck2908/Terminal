@@ -12,10 +12,9 @@ void EchoDispatch::Print(const wchar_t wchPrintable)
     wprintf(L"Print: %c (0x%x)\r\n", wchPrintable, wchPrintable);
 }
 
-void EchoDispatch::PrintString(const std::wstring_view string)
+void EchoDispatch::PrintString(const wchar_t* const rgwch, const size_t cch)
 {
-    const std::wstring nullTermString(string); // string_view not guaranteed null terminated, but wprintf needs it.
-    wprintf(L"PrintString: \"%s\" (%zd chars)\r\n", nullTermString.data(), nullTermString.size());
+    wprintf(L"PrintString: \"%s\" (%zd chars)\r\n", rgwch, cch);
 }
 
 void EchoDispatch::Execute(const wchar_t wchControl)

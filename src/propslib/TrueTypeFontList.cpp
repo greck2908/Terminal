@@ -13,7 +13,8 @@
 
 SINGLE_LIST_ENTRY TrueTypeFontList::s_ttFontList;
 
-WORD ConvertStringToDec(
+WORD
+ConvertStringToDec(
     __in LPTSTR lpch)
 {
     TCHAR ch;
@@ -32,7 +33,8 @@ WORD ConvertStringToDec(
     return val;
 }
 
-[[nodiscard]] NTSTATUS TrueTypeFontList::s_Initialize()
+[[nodiscard]]
+NTSTATUS TrueTypeFontList::s_Initialize()
 {
     HKEY hkRegistry;
     WCHAR awchValue[512];
@@ -46,12 +48,10 @@ WORD ConvertStringToDec(
     NTSTATUS Status = RegistrySerialization::s_OpenKey(HKEY_LOCAL_MACHINE,
                                                        MACHINE_REGISTRY_CONSOLE_TTFONT_WIN32_PATH,
                                                        &hkRegistry);
-    if (NT_SUCCESS(Status))
-    {
+    if (NT_SUCCESS(Status)) {
         LPTTFONTLIST pTTFontList;
 
-        for (dwIndex = 0;; dwIndex++)
-        {
+        for (dwIndex = 0; ; dwIndex++) {
             Status = RegistrySerialization::s_EnumValue(hkRegistry,
                                                         dwIndex,
                                                         sizeof(awchValue),
@@ -59,33 +59,28 @@ WORD ConvertStringToDec(
                                                         sizeof(awchData),
                                                         (PBYTE)awchData);
 
-            if (Status == ERROR_NO_MORE_ITEMS)
-            {
+            if (Status == ERROR_NO_MORE_ITEMS) {
                 Status = STATUS_SUCCESS;
                 break;
             }
 
-            if (!NT_SUCCESS(Status))
-            {
+            if (!NT_SUCCESS(Status)) {
                 break;
             }
 
             pTTFontList = (TTFONTLIST*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(TTFONTLIST));
-            if (pTTFontList == nullptr)
-            {
+            if (pTTFontList == nullptr) {
                 break;
             }
 
             pTTFontList->List.Next = nullptr;
             pTTFontList->CodePage = ConvertStringToDec(awchValue);
             pwsz = awchData;
-            if (*pwsz == BOLD_MARK)
-            {
+            if (*pwsz == BOLD_MARK) {
                 pTTFontList->fDisableBold = TRUE;
                 pwsz++;
             }
-            else
-            {
+            else {
                 pTTFontList->fDisableBold = FALSE;
             }
 
@@ -101,14 +96,13 @@ WORD ConvertStringToDec(
                 // Validate that pwsz must be pointing to a position in awchData array after the movement.
                 if (pwsz >= awchData && pwsz < (awchData + ARRAYSIZE(awchData)))
                 {
-                    if (*pwsz == BOLD_MARK)
-                    {
+                    if (*pwsz == BOLD_MARK) {
                         pTTFontList->fDisableBold = TRUE;
                         pwsz++;
                     }
                     StringCchCopyW(pTTFontList->FaceName2,
-                                   ARRAYSIZE(pTTFontList->FaceName2),
-                                   pwsz);
+                                      ARRAYSIZE(pTTFontList->FaceName2),
+                                      pwsz);
                 }
             }
 
@@ -121,14 +115,13 @@ WORD ConvertStringToDec(
     return STATUS_SUCCESS;
 }
 
-[[nodiscard]] NTSTATUS TrueTypeFontList::s_Destroy()
+[[nodiscard]]
+NTSTATUS TrueTypeFontList::s_Destroy()
 {
-    while (s_ttFontList.Next != nullptr)
-    {
+    while (s_ttFontList.Next != nullptr) {
         LPTTFONTLIST pTTFontList = (LPTTFONTLIST)PopEntryList(&s_ttFontList);
 
-        if (pTTFontList != nullptr)
-        {
+        if (pTTFontList != nullptr) {
             HeapFree(GetProcessHeap(), 0, pTTFontList);
         }
     }
@@ -144,15 +137,12 @@ LPTTFONTLIST TrueTypeFontList::s_SearchByName(_In_opt_ LPCWSTR pwszFace,
 {
     PSINGLE_LIST_ENTRY pTemp = s_ttFontList.Next;
 
-    if (pwszFace)
-    {
-        while (pTemp != nullptr)
-        {
+    if (pwszFace) {
+        while (pTemp != nullptr) {
             LPTTFONTLIST pTTFontList = (LPTTFONTLIST)pTemp;
 
             if (wcscmp(pwszFace, pTTFontList->FaceName1) == 0 ||
-                wcscmp(pwszFace, pTTFontList->FaceName2) == 0)
-            {
+                wcscmp(pwszFace, pTTFontList->FaceName2) == 0) {
                 if (fCodePage)
                     if (pTTFontList->CodePage == CodePage)
                         return pTTFontList;
@@ -169,9 +159,10 @@ LPTTFONTLIST TrueTypeFontList::s_SearchByName(_In_opt_ LPCWSTR pwszFace,
     return nullptr;
 }
 
-[[nodiscard]] NTSTATUS TrueTypeFontList::s_SearchByCodePage(const UINT uiCodePage,
-                                                            _Out_writes_(cchFaceName) PWSTR pwszFaceName,
-                                                            const size_t cchFaceName)
+[[nodiscard]]
+NTSTATUS TrueTypeFontList::s_SearchByCodePage(const UINT uiCodePage,
+                                              _Out_writes_(cchFaceName) PWSTR pwszFaceName,
+                                              const size_t cchFaceName)
 {
     NTSTATUS status = STATUS_SUCCESS;
     BOOL fFontFound = FALSE;

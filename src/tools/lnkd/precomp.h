@@ -6,8 +6,8 @@
 #include <ntrtl.h>
 #include <nturtl.h>
 #include <windows.h>
-#include <cwchar>
-#include <cstdio>
+#include <wchar.h>
+#include <stdio.h>
 #include <shlwapi.h>
 #include <propvarutil.h>
 #include <initguid.h>

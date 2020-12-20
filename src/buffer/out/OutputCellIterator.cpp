@@ -17,7 +17,7 @@ static constexpr TextAttribute InvalidTextAttribute{ INVALID_COLOR, INVALID_COLO
 // Arguments:
 // - wch - The character to use for filling
 // - fillLimit - How many times to allow this value to be viewed/filled. Infinite if 0.
-OutputCellIterator::OutputCellIterator(const wchar_t& wch, const size_t fillLimit) noexcept :
+OutputCellIterator::OutputCellIterator(const wchar_t& wch, const size_t fillLimit) :
     _mode(Mode::Fill),
     _currentView(s_GenerateView(wch)),
     _run(),
@@ -26,6 +26,7 @@ OutputCellIterator::OutputCellIterator(const wchar_t& wch, const size_t fillLimi
     _distance(0),
     _fillLimit(fillLimit)
 {
+
 }
 
 // Routine Description:
@@ -33,7 +34,7 @@ OutputCellIterator::OutputCellIterator(const wchar_t& wch, const size_t fillLimi
 // Arguments:
 // - attr - The color attribute to use for filling
 // - fillLimit - How many times to allow this value to be viewed/filled. Infinite if 0.
-OutputCellIterator::OutputCellIterator(const TextAttribute& attr, const size_t fillLimit) noexcept :
+OutputCellIterator::OutputCellIterator(const TextAttribute& attr, const size_t fillLimit) :
     _mode(Mode::Fill),
     _currentView(s_GenerateView(attr)),
     _run(),
@@ -42,6 +43,7 @@ OutputCellIterator::OutputCellIterator(const TextAttribute& attr, const size_t f
     _distance(0),
     _fillLimit(fillLimit)
 {
+
 }
 
 // Routine Description:
@@ -50,7 +52,7 @@ OutputCellIterator::OutputCellIterator(const TextAttribute& attr, const size_t f
 // - wch - The character to use for filling
 // - attr - The color attribute to use for filling
 // - fillLimit - How many times to allow this value to be viewed/filled. Infinite if 0.
-OutputCellIterator::OutputCellIterator(const wchar_t& wch, const TextAttribute& attr, const size_t fillLimit) noexcept :
+OutputCellIterator::OutputCellIterator(const wchar_t& wch, const TextAttribute& attr, const size_t fillLimit) :
     _mode(Mode::Fill),
     _currentView(s_GenerateView(wch, attr)),
     _run(),
@@ -59,14 +61,15 @@ OutputCellIterator::OutputCellIterator(const wchar_t& wch, const TextAttribute& 
     _distance(0),
     _fillLimit(fillLimit)
 {
+
 }
 
 // Routine Description:
 // - This is a fill-mode iterator for one particular CHAR_INFO. It will repeat forever if fillLimit is 0.
 // Arguments:
-// - charInfo - The legacy character and color data to use for filling (uses Unicode portion of text data)
+// - charInfo - The legacy character and color data to use for fililng (uses Unicode portion of text data)
 // - fillLimit - How many times to allow this value to be viewed/filled. Infinite if 0.
-OutputCellIterator::OutputCellIterator(const CHAR_INFO& charInfo, const size_t fillLimit) noexcept :
+OutputCellIterator::OutputCellIterator(const CHAR_INFO& charInfo, const size_t fillLimit) :
     _mode(Mode::Fill),
     _currentView(s_GenerateView(charInfo)),
     _run(),
@@ -75,6 +78,7 @@ OutputCellIterator::OutputCellIterator(const CHAR_INFO& charInfo, const size_t f
     _distance(0),
     _fillLimit(fillLimit)
 {
+
 }
 
 // Routine Description:
@@ -90,6 +94,7 @@ OutputCellIterator::OutputCellIterator(const std::wstring_view utf16Text) :
     _distance(0),
     _fillLimit(0)
 {
+
 }
 
 // Routine Description:
@@ -106,51 +111,59 @@ OutputCellIterator::OutputCellIterator(const std::wstring_view utf16Text, const 
     _pos(0),
     _fillLimit(0)
 {
+
 }
 
 // Routine Description:
 // - This is an iterator over legacy colors only. The text is not modified.
 // Arguments:
 // - legacyAttrs - One legacy color item per cell
-OutputCellIterator::OutputCellIterator(const gsl::span<const WORD> legacyAttrs) noexcept :
+// - unused - useless bool to change function signature for legacyAttrs constructor because the C++ compiler in
+//             razzle cannot distinguish between a std::wstring_view and a std::basic_string_view<WORD>
+// NOTE: This one internally casts to wchar_t because Razzle sees WORD and wchar_t as the same type
+//       despite that Visual Studio build can tell the difference.
+OutputCellIterator::OutputCellIterator(const std::basic_string_view<WORD> legacyAttrs, const bool /*unused*/) :
     _mode(Mode::LegacyAttr),
-    _currentView(s_GenerateViewLegacyAttr(til::at(legacyAttrs, 0))),
-    _run(legacyAttrs),
+    _currentView(s_GenerateViewLegacyAttr(legacyAttrs.at(0))),
+    _run(std::wstring_view(reinterpret_cast<const wchar_t*>(legacyAttrs.data()), legacyAttrs.size())),
     _attr(InvalidTextAttribute),
     _distance(0),
     _pos(0),
     _fillLimit(0)
 {
+
 }
 
 // Routine Description:
 // - This is an iterator over legacy cell data. We will use the unicode text and the legacy color attribute.
 // Arguments:
 // - charInfos - Multiple cell with unicode text and legacy color data.
-OutputCellIterator::OutputCellIterator(const gsl::span<const CHAR_INFO> charInfos) noexcept :
+OutputCellIterator::OutputCellIterator(const std::basic_string_view<CHAR_INFO> charInfos) :
     _mode(Mode::CharInfo),
-    _currentView(s_GenerateView(til::at(charInfos, 0))),
+    _currentView(s_GenerateView(charInfos.at(0))),
     _run(charInfos),
-    _attr(InvalidTextAttribute),
+    _attr(InvalidTextAttribute),  
     _distance(0),
     _pos(0),
     _fillLimit(0)
 {
+
 }
 
 // Routine Description:
 // - This is an iterator over existing OutputCells with full text and color data.
 // Arguments:
 // - cells - Multiple cells in a run
-OutputCellIterator::OutputCellIterator(const gsl::span<const OutputCell> cells) :
+OutputCellIterator::OutputCellIterator(const std::basic_string_view<OutputCell> cells) :
     _mode(Mode::Cell),
-    _currentView(s_GenerateView(til::at(cells, 0))),
+    _currentView(s_GenerateView(cells.at(0))),
     _run(cells),
     _attr(InvalidTextAttribute),
     _distance(0),
     _pos(0),
     _fillLimit(0)
 {
+
 }
 
 // Routine Description:
@@ -180,15 +193,15 @@ OutputCellIterator::operator bool() const noexcept
         }
         case Mode::Cell:
         {
-            return _pos < std::get<gsl::span<const OutputCell>>(_run).size();
+            return _pos < std::get<std::basic_string_view<OutputCell>>(_run).length();
         }
         case Mode::CharInfo:
         {
-            return _pos < std::get<gsl::span<const CHAR_INFO>>(_run).size();
+            return _pos < std::get<std::basic_string_view<CHAR_INFO>>(_run).length();
         }
         case Mode::LegacyAttr:
         {
-            return _pos < std::get<gsl::span<const WORD>>(_run).size();
+            return _pos < std::get<std::wstring_view>(_run).length();
         }
         default:
             FAIL_FAST_HR(E_NOTIMPL);
@@ -265,7 +278,7 @@ OutputCellIterator& OutputCellIterator::operator++()
         _pos++;
         if (operator bool())
         {
-            _currentView = s_GenerateView(til::at(std::get<gsl::span<const OutputCell>>(_run), _pos));
+            _currentView = s_GenerateView(std::get<std::basic_string_view<OutputCell>>(_run).at(_pos));
         }
         break;
     }
@@ -275,7 +288,7 @@ OutputCellIterator& OutputCellIterator::operator++()
         _pos++;
         if (operator bool())
         {
-            _currentView = s_GenerateView(til::at(std::get<gsl::span<const CHAR_INFO>>(_run), _pos));
+            _currentView = s_GenerateView(std::get<std::basic_string_view<CHAR_INFO>>(_run).at(_pos));
         }
         break;
     }
@@ -285,7 +298,7 @@ OutputCellIterator& OutputCellIterator::operator++()
         _pos++;
         if (operator bool())
         {
-            _currentView = s_GenerateViewLegacyAttr(til::at(std::get<gsl::span<const WORD>>(_run), _pos));
+            _currentView = s_GenerateViewLegacyAttr(std::get<std::wstring_view>(_run).at(_pos));
         }
         break;
     }
@@ -311,7 +324,7 @@ OutputCellIterator OutputCellIterator::operator++(int)
 // - Reference the view to fully-formed output cell data representing the underlying data source.
 // Return Value:
 // - Reference to the view
-const OutputCellView& OutputCellIterator::operator*() const noexcept
+const OutputCellView& OutputCellIterator::operator*() const
 {
     return _currentView;
 }
@@ -320,7 +333,7 @@ const OutputCellView& OutputCellIterator::operator*() const noexcept
 // - Get pointer to the view to fully-formed output cell data representing the underlying data source.
 // Return Value:
 // - Pointer to the view
-const OutputCellView* OutputCellIterator::operator->() const noexcept
+const OutputCellView* OutputCellIterator::operator->() const
 {
     return &_currentView;
 }
@@ -334,7 +347,7 @@ const OutputCellView* OutputCellIterator::operator->() const noexcept
 // - True if we just turned a lead half into a trailing half (and caller doesn't
 //   need to further update the view).
 // - False if this wasn't applicable and the caller should update the view.
-bool OutputCellIterator::_TryMoveTrailing() noexcept
+bool OutputCellIterator::_TryMoveTrailing()
 {
     if (_currentView.DbcsAttr().IsLeading())
     {
@@ -400,7 +413,7 @@ OutputCellView OutputCellIterator::s_GenerateView(const std::wstring_view view,
 {
     const auto glyph = Utf16Parser::ParseNext(view);
     DbcsAttribute dbcsAttr;
-    if (IsGlyphFullWidth(glyph))
+    if (!glyph.empty() && IsGlyphFullWidth(glyph))
     {
         dbcsAttr.SetLeading();
     }
@@ -417,7 +430,7 @@ OutputCellView OutputCellIterator::s_GenerateView(const std::wstring_view view,
 // - wch - View representing a single UTF-16 character (that can be represented without surrogates)
 // Return Value:
 // - Object representing the view into this cell
-OutputCellView OutputCellIterator::s_GenerateView(const wchar_t& wch) noexcept
+OutputCellView OutputCellIterator::s_GenerateView(const wchar_t& wch)
 {
     const auto glyph = std::wstring_view(&wch, 1);
 
@@ -439,7 +452,7 @@ OutputCellView OutputCellIterator::s_GenerateView(const wchar_t& wch) noexcept
 // - attr - View representing a single color
 // Return Value:
 // - Object representing the view into this cell
-OutputCellView OutputCellIterator::s_GenerateView(const TextAttribute& attr) noexcept
+OutputCellView OutputCellIterator::s_GenerateView(const TextAttribute& attr)
 {
     return OutputCellView({}, {}, attr, TextAttributeBehavior::StoredOnly);
 }
@@ -454,7 +467,7 @@ OutputCellView OutputCellIterator::s_GenerateView(const TextAttribute& attr) noe
 // - attr - View representing a single color
 // Return Value:
 // - Object representing the view into this cell
-OutputCellView OutputCellIterator::s_GenerateView(const wchar_t& wch, const TextAttribute& attr) noexcept
+OutputCellView OutputCellIterator::s_GenerateView(const wchar_t& wch, const TextAttribute& attr)
 {
     const auto glyph = std::wstring_view(&wch, 1);
 
@@ -476,12 +489,12 @@ OutputCellView OutputCellIterator::s_GenerateView(const wchar_t& wch, const Text
 // - legacyAttr - View representing a single legacy color
 // Return Value:
 // - Object representing the view into this cell
-OutputCellView OutputCellIterator::s_GenerateViewLegacyAttr(const WORD& legacyAttr) noexcept
+OutputCellView OutputCellIterator::s_GenerateViewLegacyAttr(const WORD& legacyAttr)
 {
     WORD cleanAttr = legacyAttr;
     WI_ClearAllFlags(cleanAttr, COMMON_LVB_SBCSDBCS); // don't use legacy lead/trailing byte flags for colors
 
-    const TextAttribute attr(cleanAttr);
+    TextAttribute attr(cleanAttr);
     return s_GenerateView(attr);
 }
 
@@ -494,7 +507,7 @@ OutputCellView OutputCellIterator::s_GenerateViewLegacyAttr(const WORD& legacyAt
 // - charInfo - character and attribute pair representing a single cell
 // Return Value:
 // - Object representing the view into this cell
-OutputCellView OutputCellIterator::s_GenerateView(const CHAR_INFO& charInfo) noexcept
+OutputCellView OutputCellIterator::s_GenerateView(const CHAR_INFO& charInfo)
 {
     const auto glyph = std::wstring_view(&charInfo.Char.UnicodeChar, 1);
 
@@ -508,7 +521,8 @@ OutputCellView OutputCellIterator::s_GenerateView(const CHAR_INFO& charInfo) noe
         dbcsAttr.SetTrailing();
     }
 
-    const TextAttribute textAttr(charInfo.Attributes);
+    TextAttribute textAttr;
+    textAttr.SetFromLegacy(charInfo.Attributes);
 
     const auto behavior = TextAttributeBehavior::Stored;
     return OutputCellView(glyph, dbcsAttr, textAttr, behavior);

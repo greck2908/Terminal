@@ -14,7 +14,7 @@ Author(s):
 
 #pragma once
 
-#include "../inc/IConsoleInputThread.hpp"
+#include "..\inc\IConsoleInputThread.hpp"
 #include "ConIoSrvComm.hpp"
 
 #pragma hdrstop
@@ -26,9 +26,9 @@ namespace Microsoft::Console::Interactivity::OneCore
     public:
         HANDLE Start();
 
-        ConIoSrvComm* GetConIoSrvComm();
+        ConIoSrvComm *GetConIoSrvComm();
 
     private:
-        ConIoSrvComm* _pConIoSrvComm;
+        ConIoSrvComm *_pConIoSrvComm;
     };
 }

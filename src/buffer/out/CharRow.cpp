@@ -15,16 +15,13 @@
 // Return Value:
 // - instantiated object
 // Note: will through if unable to allocate char/attribute buffers
-#pragma warning(push)
-#pragma warning(disable : 26447) // small_vector's constructor says it can throw but it should not given how we use it.  This suppresses this error for the AuditMode build.
-CharRow::CharRow(size_t rowWidth, ROW* const pParent) noexcept :
+CharRow::CharRow(size_t rowWidth, ROW* const pParent) :
     _wrapForced{ false },
     _doubleBytePadded{ false },
     _data(rowWidth, value_type()),
     _pParent{ FAIL_FAST_IF_NULL(pParent) }
 {
 }
-#pragma warning(pop)
 
 // Routine Description:
 // - Sets the wrap status for the current row
@@ -87,7 +84,7 @@ size_t CharRow::size() const noexcept
 // - sRowWidth - The width of the row.
 // Return Value:
 // - <none>
-void CharRow::Reset() noexcept
+void CharRow::Reset()
 {
     for (auto& cell : _data)
     {
@@ -104,7 +101,8 @@ void CharRow::Reset() noexcept
 // - newSize - the new width of the character and attributes rows
 // Return Value:
 // - S_OK on success, otherwise relevant error code
-[[nodiscard]] HRESULT CharRow::Resize(const size_t newSize) noexcept
+[[nodiscard]]
+HRESULT CharRow::Resize(const size_t newSize) noexcept
 {
     try
     {
@@ -142,9 +140,9 @@ typename CharRow::const_iterator CharRow::cend() const noexcept
 // - <none>
 // Return Value:
 // - The calculated left boundary of the internal string.
-size_t CharRow::MeasureLeft() const noexcept
+size_t CharRow::MeasureLeft() const
 {
-    const_iterator it = _data.cbegin();
+    std::vector<value_type>::const_iterator it = _data.cbegin();
     while (it != _data.cend() && it->IsSpace())
     {
         ++it;
@@ -158,9 +156,9 @@ size_t CharRow::MeasureLeft() const noexcept
 // - <none>
 // Return Value:
 // - The calculated right boundary of the internal string.
-size_t CharRow::MeasureRight() const
+size_t CharRow::MeasureRight() const noexcept
 {
-    const_reverse_iterator it = _data.crbegin();
+    std::vector<value_type>::const_reverse_iterator it = _data.crbegin();
     while (it != _data.crend() && it->IsSpace())
     {
         ++it;
@@ -212,7 +210,7 @@ const DbcsAttribute& CharRow::DbcsAttrAt(const size_t column) const
 // Note: will throw exception if column is out of bounds
 DbcsAttribute& CharRow::DbcsAttrAt(const size_t column)
 {
-    return _data.at(column).DbcsAttr();
+    return const_cast<DbcsAttribute&>(static_cast<const CharRow* const>(this)->DbcsAttrAt(column));
 }
 
 // Routine Description:
@@ -253,58 +251,54 @@ CharRow::reference CharRow::GlyphAt(const size_t column)
     return { *this, column };
 }
 
+// Routine Description:
+// - returns string containing text data exactly how it's stored internally, including doubling of
+// leading/trailing cells.
+// Arguments:
+// - none
+// Return Value:
+// - text stored in char row
+// - Note: will throw exception if out of memory
+std::wstring CharRow::GetTextRaw() const
+{
+    std::wstring wstr;
+    wstr.reserve(_data.size());
+    for (size_t i = 0;  i < _data.size(); ++i)
+    {
+        auto glyph = GlyphAt(i);
+        for (auto it = glyph.begin(); it != glyph.end(); ++it)
+        {
+            wstr.push_back(*it);
+        }
+    }
+    return wstr;
+}
+
 std::wstring CharRow::GetText() const
 {
     std::wstring wstr;
     wstr.reserve(_data.size());
 
-    for (size_t i = 0; i < _data.size(); ++i)
+    for (size_t i = 0;  i < _data.size(); ++i)
     {
-        const auto glyph = GlyphAt(i);
+        auto glyph = GlyphAt(i);
         if (!DbcsAttrAt(i).IsTrailing())
         {
-            for (const auto wch : glyph)
+            for (auto it = glyph.begin(); it != glyph.end(); ++it)
             {
-                wstr.push_back(wch);
+                wstr.push_back(*it);
             }
         }
     }
     return wstr;
 }
 
-// Method Description:
-// - get delimiter class for a position in the char row
-// - used for double click selection and uia word navigation
-// Arguments:
-// - column: column to get text data for
-// - wordDelimiters: the delimiters defined as a part of the DelimiterClass::DelimiterChar
-// Return Value:
-// - the delimiter class for the given char
-const DelimiterClass CharRow::DelimiterClassAt(const size_t column, const std::wstring_view wordDelimiters) const
-{
-    THROW_HR_IF(E_INVALIDARG, column >= _data.size());
-
-    const auto glyph = *GlyphAt(column).begin();
-    if (glyph <= UNICODE_SPACE)
-    {
-        return DelimiterClass::ControlChar;
-    }
-    else if (wordDelimiters.find(glyph) != std::wstring_view::npos)
-    {
-        return DelimiterClass::DelimiterChar;
-    }
-    else
-    {
-        return DelimiterClass::RegularChar;
-    }
-}
-
-UnicodeStorage& CharRow::GetUnicodeStorage() noexcept
+UnicodeStorage& CharRow::GetUnicodeStorage()
 {
     return _pParent->GetUnicodeStorage();
 }
 
-const UnicodeStorage& CharRow::GetUnicodeStorage() const noexcept
+const UnicodeStorage& CharRow::GetUnicodeStorage() const
 {
     return _pParent->GetUnicodeStorage();
 }
@@ -315,7 +309,7 @@ const UnicodeStorage& CharRow::GetUnicodeStorage() const noexcept
 // - column - the column to generate the key for
 // Return Value:
 // - the COORD key for data access from UnicodeStorage for the column
-COORD CharRow::GetStorageKey(const size_t column) const noexcept
+COORD CharRow::GetStorageKey(const size_t column) const
 {
     return { gsl::narrow<SHORT>(column), _pParent->GetId() };
 }
@@ -324,7 +318,7 @@ COORD CharRow::GetStorageKey(const size_t column) const noexcept
 // - Updates the pointer to the parent row (which might change if we shuffle the rows around)
 // Arguments:
 // - pParent - Pointer to the parent row
-void CharRow::UpdateParent(ROW* const pParent)
+void CharRow::UpdateParent(ROW* const pParent) noexcept
 {
     _pParent = FAIL_FAST_IF_NULL(pParent);
 }

@@ -26,10 +26,10 @@ const byte MostSignificantBitMask = 0x80;
 // Return Value:
 // - A new instance of the parser.
 Utf8ToWideCharParser::Utf8ToWideCharParser(const unsigned int codePage) :
-    _currentCodePage{ codePage },
-    _bytesStored{ 0 },
-    _currentState{ _State::Ready },
-    _convertedWideChars{ nullptr }
+    _currentCodePage { codePage },
+    _bytesStored { 0 },
+    _currentState { _State::Ready },
+    _convertedWideChars { nullptr }
 {
     std::fill_n(_utf8CodePointPieces, _UTF8_BYTE_SEQUENCE_MAX, 0ui8);
 }
@@ -65,11 +65,12 @@ void Utf8ToWideCharParser::SetCodePage(const unsigned int codePage)
 // in. On error this will contain nullptr instead of an array.
 // Return Value:
 // - <none>
-[[nodiscard]] HRESULT Utf8ToWideCharParser::Parse(_In_reads_(cchBuffer) const byte* const pBytes,
-                                                  _In_ unsigned int const cchBuffer,
-                                                  _Out_ unsigned int& cchConsumed,
-                                                  _Inout_ std::unique_ptr<wchar_t[]>& converted,
-                                                  _Out_ unsigned int& cchConverted)
+[[nodiscard]]
+HRESULT Utf8ToWideCharParser::Parse(_In_reads_(cchBuffer) const byte* const pBytes,
+                                    _In_ unsigned int const cchBuffer,
+                                    _Out_ unsigned int& cchConsumed,
+                                    _Inout_ std::unique_ptr<wchar_t[]>& converted,
+                                    _Out_ unsigned int& cchConverted)
 {
     cchConsumed = 0;
     cchConverted = 0;
@@ -92,33 +93,33 @@ void Utf8ToWideCharParser::SetCodePage(const unsigned int codePage)
         _convertedWideChars.reset(nullptr);
         while (loop)
         {
-            switch (_currentState)
+            switch(_currentState)
             {
-            case _State::Ready:
-                wideCharCount = _ParseFullRange(pBytes, cchBuffer);
-                break;
-            case _State::BeginPartialParse:
-                wideCharCount = _InvolvedParse(pBytes, cchBuffer);
-                break;
-            case _State::Error:
-                hr = E_FAIL;
-                _Reset();
-                wideCharCount = 0;
-                loop = false;
-                break;
-            case _State::Finished:
-                _currentState = _State::Ready;
-                cchConsumed = cchBuffer;
-                loop = false;
-                break;
-            case _State::AwaitingMoreBytes:
-                _currentState = _State::BeginPartialParse;
-                cchConsumed = cchBuffer;
-                loop = false;
-                break;
-            default:
-                _currentState = _State::Error;
-                break;
+                case _State::Ready:
+                    wideCharCount = _ParseFullRange(pBytes, cchBuffer);
+                    break;
+                case _State::BeginPartialParse:
+                    wideCharCount = _InvolvedParse(pBytes, cchBuffer);
+                    break;
+                case _State::Error:
+                    hr = E_FAIL;
+                    _Reset();
+                    wideCharCount = 0;
+                    loop = false;
+                    break;
+                case _State::Finished:
+                    _currentState = _State::Ready;
+                    cchConsumed = cchBuffer;
+                    loop = false;
+                    break;
+                case _State::AwaitingMoreBytes:
+                    _currentState = _State::BeginPartialParse;
+                    cchConsumed = cchBuffer;
+                    loop = false;
+                    break;
+                default:
+                    _currentState = _State::Error;
+                    break;
             }
         }
         converted.swap(_convertedWideChars);
@@ -325,10 +326,7 @@ unsigned int Utf8ToWideCharParser::_ParseFullRange(_In_reads_(cb) const byte* co
             LOG_LAST_ERROR();
             _currentState = _State::Error;
         }
-        else
-        {
-            _currentState = _State::Finished;
-        }
+        _currentState = _State::Finished;
     }
     return bufferSize;
 }
@@ -377,17 +375,8 @@ unsigned int Utf8ToWideCharParser::_InvolvedParse(_In_reads_(cb) const byte* con
         _currentState = _State::AwaitingMoreBytes;
         return 0;
     }
-
-    // By this point, all obviously invalid sequences have been removed.
-    // But non-minimal forms of sequences might still exist.
-    // MB2WC will fail non-minimal forms with MB_ERR_INVALID_CHARS at this point.
-    // So we call with flags = 0 such that non-minimal forms get the U+FFFD
-    // replacement character treatment.
-    // This issue and related concerns are fully captured in future work item GH#3378
-    // for future cleanup and reconciliation.
-    // The original issue introducing this was GH#3320.
     int bufferSize = MultiByteToWideChar(_currentCodePage,
-                                         0,
+                                         MB_ERR_INVALID_CHARS,
                                          reinterpret_cast<LPCCH>(validSequence.first.get()),
                                          validSequence.second,
                                          nullptr,
@@ -401,11 +390,11 @@ unsigned int Utf8ToWideCharParser::_InvolvedParse(_In_reads_(cb) const byte* con
     {
         _convertedWideChars = std::make_unique<wchar_t[]>(bufferSize);
         bufferSize = MultiByteToWideChar(_currentCodePage,
-                                         0,
-                                         reinterpret_cast<LPCCH>(validSequence.first.get()),
-                                         validSequence.second,
-                                         _convertedWideChars.get(),
-                                         bufferSize);
+                                        0,
+                                        reinterpret_cast<LPCCH>(validSequence.first.get()),
+                                        validSequence.second,
+                                        _convertedWideChars.get(),
+                                        bufferSize);
         if (bufferSize == 0)
         {
             LOG_LAST_ERROR();
@@ -457,7 +446,7 @@ std::pair<std::unique_ptr<byte[]>, unsigned int> Utf8ToWideCharParser::_RemoveIn
             if (_IsValidMultiByteSequence(&pInputChars[currentByteInput], cb - currentByteInput))
             {
                 const unsigned int sequenceSize = _Utf8SequenceSize(pInputChars[currentByteInput]);
-                // min is to guard against static analysis possible buffer overflow
+                // min is to guard against static analyis possible buffer overflow
                 const unsigned int limit = std::min(sequenceSize, cb - currentByteInput);
                 for (unsigned int i = 0; i < limit; ++i)
                 {
@@ -516,5 +505,5 @@ void Utf8ToWideCharParser::_Reset()
 {
     _currentState = _State::Ready;
     _bytesStored = 0;
-    _convertedWideChars.reset(nullptr);
+    _convertedWideChars.release();
 }

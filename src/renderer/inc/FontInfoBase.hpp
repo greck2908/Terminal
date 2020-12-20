@@ -20,34 +20,32 @@ Author(s):
 
 #include "IFontDefaultList.hpp"
 
-static constexpr wchar_t DEFAULT_TT_FONT_FACENAME[]{ L"__DefaultTTFont__" };
-static constexpr wchar_t DEFAULT_RASTER_FONT_FACENAME[]{ L"Terminal" };
+#define DEFAULT_TT_FONT_FACENAME L"__DefaultTTFont__"
+#define DEFAULT_RASTER_FONT_FACENAME L"Terminal"
 
 class FontInfoBase
 {
 public:
-    FontInfoBase(const std::wstring_view faceName,
-                 const unsigned char family,
-                 const unsigned int weight,
+    FontInfoBase(_In_ PCWSTR const pwszFaceName,
+                 const BYTE bFamily,
+                 const LONG lWeight,
                  const bool fSetDefaultRasterFont,
-                 const unsigned int uiCodePage);
+                 const UINT uiCodePage);
 
-    FontInfoBase(const FontInfoBase& fibFont);
+    FontInfoBase(const FontInfoBase &fibFont);
 
     ~FontInfoBase();
 
-    unsigned char GetFamily() const;
-    unsigned int GetWeight() const;
-    const std::wstring_view GetFaceName() const;
-    unsigned int GetCodePage() const;
-
-    HRESULT FillLegacyNameBuffer(gsl::span<wchar_t> buffer) const;
+    BYTE GetFamily() const;
+    LONG GetWeight() const;
+    PCWCHAR GetFaceName() const;
+    UINT GetCodePage() const;
 
     bool IsTrueTypeFont() const;
 
-    void SetFromEngine(const std::wstring_view faceName,
-                       const unsigned char family,
-                       const unsigned int weight,
+    void SetFromEngine(_In_ PCWSTR const pwszFaceName,
+                       const BYTE bFamily,
+                       const LONG lWeight,
                        const bool fSetDefaultRasterFont);
 
     bool WasDefaultRasterSetFromEngine() const;
@@ -62,10 +60,10 @@ protected:
     bool IsDefaultRasterFontNoSize() const;
 
 private:
-    std::wstring _faceName;
-    unsigned int _weight;
-    unsigned char _family;
-    unsigned int _codePage;
+    WCHAR _wszFaceName[LF_FACESIZE];
+    LONG _lWeight;
+    BYTE _bFamily;
+    UINT _uiCodePage;
     bool _fDefaultRasterSetFromEngine;
 };
 

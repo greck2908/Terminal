@@ -19,24 +19,15 @@ Abstract:
 #define NOMINMAX
 
 #define WIN32_LEAN_AND_MEAN
-#define NOMCX
-#define NOHELP
-#define NOCOMM
-
 #include <unknwn.h>
 
 #define NT_SUCCESS(Status) (((NTSTATUS)(Status)) >= 0)
 
 #include <windows.h>
-#include <UIAutomation.h>
-#include <cstdlib>
-#include <cstring>
+#include <stdlib.h>
+#include <string.h>
 #include <shellscalingapi.h>
-#include <windowsx.h>
-#include <ShObjIdl.h>
 
-// Manually include til after we include Windows.Foundation to give it winrt superpowers
-#define BLOCK_TIL
 #include "../inc/LibraryIncludes.h"
 
 // This is inexplicable, but for whatever reason, cppwinrt conflicts with the
@@ -46,9 +37,6 @@ Abstract:
 #ifdef GetCurrentTime
 #undef GetCurrentTime
 #endif
-
-#include <wil/cppwinrt.h>
-
 // Needed just for XamlIslands to work at all:
 #include <winrt/Windows.system.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -60,19 +48,3 @@ Abstract:
 //  * Media for ScaleTransform
 #include <winrt/Windows.UI.Xaml.Controls.h>
 #include <winrt/Windows.ui.xaml.media.h>
-
-#include <wil/resource.h>
-#include <wil/win32_helpers.h>
-
-// Including TraceLogging essentials for the binary
-#include <TraceLoggingProvider.h>
-#include <winmeta.h>
-TRACELOGGING_DECLARE_PROVIDER(g_hWindowsTerminalProvider);
-#include <telemetry/ProjectTelemetry.h>
-#include <TraceLoggingActivity.h>
-
-// For commandline argument processing
-#include <shellapi.h>
-#include <processenv.h>
-#include <WinUser.h>
-#include "til.h"

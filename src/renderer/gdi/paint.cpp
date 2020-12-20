@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
+
 #include "precomp.h"
 #include <vector>
 #include "gdirenderer.hpp"
@@ -17,10 +18,11 @@ using namespace Microsoft::Console::Render;
 // - <none>
 // Return Value:
 // - S_OK if we started to paint. S_FALSE if we didn't need to paint. HRESULT error code if painting didn't start successfully.
-[[nodiscard]] HRESULT GdiEngine::StartPaint() noexcept
+[[nodiscard]]
+HRESULT GdiEngine::StartPaint() noexcept
 {
     // If we have no handle, we don't need to paint. Return quickly.
-    RETURN_HR_IF(S_FALSE, !_IsWindowValid());
+    RETURN_HR_IF(S_FALSE, INVALID_HANDLE_VALUE == _hwndTargetWindow);
 
     // If we're already painting, we don't need to paint. Return quickly.
     RETURN_HR_IF(S_FALSE, _fPaintStarted);
@@ -62,7 +64,8 @@ using namespace Microsoft::Console::Render;
 // - <none>
 // Return Value:
 // - S_OK, suitable GDI HRESULT error, error from Win32 windowing, or safemath error.
-[[nodiscard]] HRESULT GdiEngine::ScrollFrame() noexcept
+[[nodiscard]]
+HRESULT GdiEngine::ScrollFrame() noexcept
 {
     // If we don't have any scrolling to do, return early.
     RETURN_HR_IF(S_OK, 0 == _szInvalidScroll.cx && 0 == _szInvalidScroll.cy);
@@ -121,7 +124,8 @@ using namespace Microsoft::Console::Render;
 // - hwnd - Window handle to use for the DC properties when creating a memory DC and for checking the client area size.
 // Return Value:
 // - S_OK or suitable GDI HRESULT error.
-[[nodiscard]] HRESULT GdiEngine::_PrepareMemoryBitmap(const HWND hwnd) noexcept
+[[nodiscard]]
+HRESULT GdiEngine::_PrepareMemoryBitmap(const HWND hwnd) noexcept
 {
     RECT rcClient;
     RETURN_HR_IF(E_FAIL, !(GetClientRect(hwnd, &rcClient)));
@@ -187,7 +191,8 @@ using namespace Microsoft::Console::Render;
 // - <none>
 // Return Value:
 // - S_OK or suitable GDI HRESULT error.
-[[nodiscard]] HRESULT GdiEngine::EndPaint() noexcept
+[[nodiscard]]
+HRESULT GdiEngine::EndPaint() noexcept
 {
     // If we try to end a paint that wasn't started, it's invalid. Return.
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), !(_fPaintStarted));
@@ -225,7 +230,8 @@ using namespace Microsoft::Console::Render;
 // - <none>
 // Return Value:
 // - S_FALSE since we do nothing.
-[[nodiscard]] HRESULT GdiEngine::Present() noexcept
+[[nodiscard]]
+HRESULT GdiEngine::Present() noexcept
 {
     return S_FALSE;
 }
@@ -236,7 +242,8 @@ using namespace Microsoft::Console::Render;
 // - prc - Rectangle to fill with color
 // Return Value:
 // - S_OK or suitable GDI HRESULT error.
-[[nodiscard]] HRESULT GdiEngine::_PaintBackgroundColor(const RECT* const prc) noexcept
+[[nodiscard]]
+HRESULT GdiEngine::_PaintBackgroundColor(const RECT* const prc) noexcept
 {
     wil::unique_hbrush hbr(GetStockBrush(DC_BRUSH));
     RETURN_HR_IF_NULL(E_FAIL, hbr.get());
@@ -256,15 +263,9 @@ using namespace Microsoft::Console::Render;
 // - <none>
 // Return Value:
 // - S_OK or suitable GDI HRESULT error.
-[[nodiscard]] HRESULT GdiEngine::PaintBackground() noexcept
+[[nodiscard]]
+HRESULT GdiEngine::PaintBackground() noexcept
 {
-    // We need to clear the cursorInvertRects at the start of a paint cycle so
-    // we don't inadvertently retain the invert region from the last paint after
-    // the cursor is hidden. If we don't, the ScrollFrame method may attempt to
-    // clean up a cursor that is no longer there, and instead leave a bunch of
-    // "ghost" cursor instances on the screen.
-    cursorInvertRects.clear();
-
     if (_psInvalidData.fErase)
     {
         RETURN_IF_FAILED(_PaintBackgroundColor(&_psInvalidData.rcPaint));
@@ -291,10 +292,10 @@ using namespace Microsoft::Console::Render;
 // See: Win7: 390673, 447839 and then superseded by http://osgvsowi/638274 when FE/non-FE rendering condensed.
 //#define CONSOLE_EXTTEXTOUT_FLAGS ETO_OPAQUE | ETO_CLIPPED
 //#define MAX_POLY_LINES 80
-[[nodiscard]] HRESULT GdiEngine::PaintBufferLine(gsl::span<const Cluster> const clusters,
-                                                 const COORD coord,
-                                                 const bool trimLeft,
-                                                 const bool /*lineWrapped*/) noexcept
+[[nodiscard]]
+HRESULT GdiEngine::PaintBufferLine(std::basic_string_view<Cluster> const clusters,
+                                   const COORD coord,
+                                   const bool trimLeft) noexcept
 {
     try
     {
@@ -323,9 +324,9 @@ using namespace Microsoft::Console::Render;
         // Convert data from clusters into the text array and the widths array.
         for (size_t i = 0; i < cchLine; i++)
         {
-            const auto& cluster = til::at(clusters, i);
+            const auto& cluster = clusters.at(i);
 
-            // Our GDI renderer hasn't and isn't going to handle things above U+FFFF or sequences.
+            // Our GDI renderer hasn't and isn't going to handle things above U+FFFF or sequences. 
             // So replace anything complicated with a replacement character for drawing purposes.
             pwsPoly[i] = cluster.GetTextAsSingle();
             rgdxPoly[i] = gsl::narrow<int>(cluster.GetColumns()) * coordFontSize.X;
@@ -406,7 +407,8 @@ using namespace Microsoft::Console::Render;
 // - <none>
 // Return Value:
 // - S_OK or E_FAIL if GDI failed.
-[[nodiscard]] HRESULT GdiEngine::_FlushBufferLines() noexcept
+[[nodiscard]]
+HRESULT GdiEngine::_FlushBufferLines() noexcept
 {
     HRESULT hr = S_OK;
 
@@ -447,8 +449,12 @@ using namespace Microsoft::Console::Render;
 // - coordTarget - The starting X/Y position of the first character to draw on.
 // Return Value:
 // - S_OK or suitable GDI HRESULT error or E_FAIL for GDI errors in functions that don't reliably return a specific error code.
-[[nodiscard]] HRESULT GdiEngine::PaintBufferGridLines(const GridLines lines, const COLORREF color, const size_t cchLine, const COORD coordTarget) noexcept
+[[nodiscard]]
+HRESULT GdiEngine::PaintBufferGridLines(const GridLines lines, const COLORREF color, const size_t cchLine, const COORD coordTarget) noexcept
 {
+    // Return early if there are no lines to paint.
+    RETURN_HR_IF(S_OK, GridLines::None == lines);
+
     LOG_IF_FAILED(_FlushBufferLines());
 
     // Convert the target from characters to pixels.
@@ -466,64 +472,40 @@ using namespace Microsoft::Console::Render;
     auto restoreBrushOnExit = wil::scope_exit([&] { hbr.reset(SelectBrush(_hdcMemoryContext, hbrPrev.get())); });
 
     // Get the font size so we know the size of the rectangle lines we'll be inscribing.
-    const auto fontWidth = _GetFontSize().X;
-    const auto fontHeight = _GetFontSize().Y;
-    const auto widthOfAllCells = fontWidth * gsl::narrow_cast<unsigned>(cchLine);
+    COORD const coordFontSize = _GetFontSize();
 
-    const auto DrawLine = [=](const auto x, const auto y, const auto w, const auto h) {
-        return PatBlt(_hdcMemoryContext, x, y, w, h, PATCOPY);
-    };
-
-    if (lines & GridLines::Left)
+    // For each length of the line, inscribe the various lines as specified by the enum
+    for (size_t i = 0; i < cchLine; i++)
     {
-        auto x = ptTarget.x;
-        for (size_t i = 0; i < cchLine; i++, x += fontWidth)
+        if (lines & GridLines::Top)
         {
-            RETURN_HR_IF(E_FAIL, !DrawLine(x, ptTarget.y, _lineMetrics.gridlineWidth, fontHeight));
+            RETURN_HR_IF(E_FAIL, !(PatBlt(_hdcMemoryContext, ptTarget.x, ptTarget.y, coordFontSize.X, 1, PATCOPY)));
         }
-    }
 
-    if (lines & GridLines::Right)
-    {
-        // NOTE: We have to subtract the stroke width from the cell width
-        // to ensure the x coordinate remains inside the clipping rectangle.
-        auto x = ptTarget.x + fontWidth - _lineMetrics.gridlineWidth;
-        for (size_t i = 0; i < cchLine; i++, x += fontWidth)
+        if (lines & GridLines::Left)
         {
-            RETURN_HR_IF(E_FAIL, !DrawLine(x, ptTarget.y, _lineMetrics.gridlineWidth, fontHeight));
+            RETURN_HR_IF(E_FAIL, !(PatBlt(_hdcMemoryContext, ptTarget.x, ptTarget.y, 1, coordFontSize.Y, PATCOPY)));
         }
-    }
 
-    if (lines & GridLines::Top)
-    {
-        const auto y = ptTarget.y;
-        RETURN_HR_IF(E_FAIL, !DrawLine(ptTarget.x, y, widthOfAllCells, _lineMetrics.gridlineWidth));
-    }
+        // NOTE: Watch out for inclusive/exclusive rectangles here.
+        // We have to remove 1 from the font size for the bottom and right lines to ensure that the
+        // starting point remains within the clipping rectangle.
+        // For example, if we're drawing a letter at 0,0 and the font size is 8x16....
+        // The bottom left corner inclusive is at 0,15 which is Y (0) + Font Height (16) - 1 = 15.
+        // The top right corner inclusive is at 7,0 which is X (0) + Font Height (8) - 1 = 7.
 
-    if (lines & GridLines::Bottom)
-    {
-        // NOTE: We have to subtract the stroke width from the cell height
-        // to ensure the y coordinate remains inside the clipping rectangle.
-        const auto y = ptTarget.y + fontHeight - _lineMetrics.gridlineWidth;
-        RETURN_HR_IF(E_FAIL, !DrawLine(ptTarget.x, y, widthOfAllCells, _lineMetrics.gridlineWidth));
-    }
-
-    if (lines & (GridLines::Underline | GridLines::DoubleUnderline))
-    {
-        const auto y = ptTarget.y + _lineMetrics.underlineOffset;
-        RETURN_HR_IF(E_FAIL, !DrawLine(ptTarget.x, y, widthOfAllCells, _lineMetrics.underlineWidth));
-
-        if (lines & GridLines::DoubleUnderline)
+        if (lines & GridLines::Bottom)
         {
-            const auto y2 = ptTarget.y + _lineMetrics.underlineOffset2;
-            RETURN_HR_IF(E_FAIL, !DrawLine(ptTarget.x, y2, widthOfAllCells, _lineMetrics.underlineWidth));
+            RETURN_HR_IF(E_FAIL, !(PatBlt(_hdcMemoryContext, ptTarget.x, ptTarget.y + coordFontSize.Y - 1, coordFontSize.X, 1, PATCOPY)));
         }
-    }
 
-    if (lines & GridLines::Strikethrough)
-    {
-        const auto y = ptTarget.y + _lineMetrics.strikethroughOffset;
-        RETURN_HR_IF(E_FAIL, !DrawLine(ptTarget.x, y, widthOfAllCells, _lineMetrics.strikethroughWidth));
+        if (lines & GridLines::Right)
+        {
+            RETURN_HR_IF(E_FAIL, !(PatBlt(_hdcMemoryContext, ptTarget.x + coordFontSize.X - 1, ptTarget.y, 1, coordFontSize.Y, PATCOPY)));
+        }
+
+        // Move to the next character in this run.
+        ptTarget.x += coordFontSize.X;
     }
 
     return S_OK;
@@ -535,7 +517,8 @@ using namespace Microsoft::Console::Render;
 // - options - Parameters that affect the way that the cursor is drawn
 // Return Value:
 // - S_OK, suitable GDI HRESULT error, or safemath error, or E_FAIL in a GDI error where a specific error isn't set.
-[[nodiscard]] HRESULT GdiEngine::PaintCursor(const CursorOptions& options) noexcept
+[[nodiscard]]
+HRESULT GdiEngine::PaintCursor(const IRenderEngine::CursorOptions& options) noexcept
 {
     // if the cursor is off, do nothing - it should not be visible.
     if (!options.isOn)
@@ -658,7 +641,8 @@ using namespace Microsoft::Console::Render;
 //  - rect - Rectangle to invert or highlight to make the selection area
 // Return Value:
 // - S_OK or suitable GDI HRESULT error.
-[[nodiscard]] HRESULT GdiEngine::PaintSelection(const SMALL_RECT rect) noexcept
+[[nodiscard]]
+HRESULT GdiEngine::PaintSelection(const SMALL_RECT rect) noexcept
 {
     LOG_IF_FAILED(_FlushBufferLines());
 
@@ -695,7 +679,7 @@ void GdiEngine::_CreateDebugWindow()
                                        0,
                                        0,
                                        0,
-                                       nullptr,
+                                       0,
                                        nullptr,
                                        nullptr,
                                        nullptr);
@@ -734,7 +718,7 @@ void GdiEngine::_PaintDebugRect(const RECT* const prc) const
 
 // Routine Description:
 // - Will immediately Blt the given rectangle to the screen for aid in debugging when it is tough to see
-//   what is occurring with the in-memory DC.
+//   what is occuring with the in-memory DC.
 // - This will pause the thread for 200ms when called to give you an opportunity to see the paint.
 // - NOTE: You must set _fDebug flag for this to operate using a debugger.
 // - NOTE: This only works in Debug (DBG) builds.

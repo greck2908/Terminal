@@ -3,10 +3,6 @@
 
 #include "precomp.h"
 
-using namespace WEX::TestExecution;
-using namespace WEX::Common;
-using namespace WEX::Logging;
-
 const DWORD _dwMaxMillisecondsToWaitOnStartup = 120 * 1000;
 const DWORD _dwStartupWaitPollingIntervalInMilliseconds = 200;
 
@@ -17,7 +13,6 @@ static PCWSTR pwszForceV2ValueName = L"ForceV2";
 // instead of using the Windows-default copy of console host.
 
 wil::unique_handle hJob;
-wil::unique_process_information pi;
 
 static FILE* std_out = nullptr;
 static FILE* std_in = nullptr;
@@ -47,23 +42,6 @@ BEGIN_MODULE()
     MODULE_PROPERTY(L"WinPerf.WPRProfile", L"ConsolePerf.wprp")
     MODULE_PROPERTY(L"WinPerf.WPRProfileId", L"ConsolePerf.Verbose.File")
     MODULE_PROPERTY(L"WinPerf.Regions", L"ConsolePerf.Regions.xml")
-
-    MODULE_PROPERTY(L"ArtifactUnderTest", L"onecore\\internal\\sdk\\lib\\minwin\\$arch\\api-ms-win-core-console-l1-2-1.lib")
-    MODULE_PROPERTY(L"ArtifactUnderTest", L"onecore\\internal\\sdk\\lib\\minwin\\$arch\\api-ms-win-core-console-l2-2-0.lib")
-    MODULE_PROPERTY(L"ArtifactUnderTest", L"onecore\\internal\\sdk\\lib\\minwin\\$arch\\api-ms-win-core-console-l3-2-0.lib")
-    MODULE_PROPERTY(L"ArtifactUnderTest", L"onecore\\internal\\mincore\\priv_sdk\\lib\\$arch\\api-ms-win-core-console-ansi-l2-1-0.lib")
-    MODULE_PROPERTY(L"ArtifactUnderTest", L"onecore\\internal\\minwin\\priv_sdk\\inc\\conmsgl1.h")
-    MODULE_PROPERTY(L"ArtifactUnderTest", L"onecore\\internal\\minwin\\priv_sdk\\inc\\conmsgl2.h")
-    MODULE_PROPERTY(L"ArtifactUnderTest", L"onecore\\internal\\minwin\\priv_sdk\\inc\\conmsgl3.h")
-    MODULE_PROPERTY(L"ArtifactUnderTest", L"onecore\\internal\\windows\\inc\\winconp.h")
-
-    // Public
-    MODULE_PROPERTY(L"ArtifactUnderTest", L"onecore\\external\\sdk\\inc\\wincon.h")
-    MODULE_PROPERTY(L"ArtifactUnderTest", L"onecore\\external\\sdk\\inc\\wincontypes.h")
-
-    // Relative to _NTTREE
-    MODULE_PROPERTY(L"BinaryUnderTest", L"conhostv1.dll")
-    MODULE_PROPERTY(L"BinaryUnderTest", L"conhost.exe")
 END_MODULE()
 
 MODULE_SETUP(ModuleSetup)
@@ -92,12 +70,10 @@ MODULE_SETUP(ModuleSetup)
     if (testAsV1)
     {
         v2ModeHelper.reset(new CommonV1V2Helper(CommonV1V2Helper::ForceV2States::V1));
-        Common::_isV2 = false;
     }
     else
     {
         v2ModeHelper.reset(new CommonV1V2Helper(CommonV1V2Helper::ForceV2States::V2));
-        Common::_isV2 = true;
     }
 
     // Retrieve location of directory that the test was deployed to.
@@ -109,13 +85,11 @@ MODULE_SETUP(ModuleSetup)
     // The OS will auto-start the inbox conhost to host this process.
     if (insideWindows || testAsV1)
     {
-        WEX::Logging::Log::Comment(L"Launching with inbox conhost.exe");
         value = value.Append(L"Nihilist.exe");
     }
     else
     {
         // If we're outside or testing V2, let's use the open console binary we built.
-        WEX::Logging::Log::Comment(L"Launching with OpenConsole.exe");
         value = value.Append(L"OpenConsole.exe Nihilist.exe");
     }
 
@@ -125,7 +99,7 @@ MODULE_SETUP(ModuleSetup)
     // We use regular new (not a smart pointer) and a scope exit delete because CreateProcess needs mutable space
     // and it'd be annoying to const_cast the smart pointer's .get() just for the sake of.
     PWSTR str = new WCHAR[cchNeeded];
-    auto cleanStr = wil::scope_exit([&] { if (nullptr != str) { delete[] str; } });
+    auto cleanStr = wil::scope_exit([&] { if (nullptr != str) { delete[] str; }});
 
     VERIFY_SUCCEEDED_RETURN(StringCchCopyW(str, cchNeeded, (WCHAR*)value.GetBuffer()));
 
@@ -141,6 +115,7 @@ MODULE_SETUP(ModuleSetup)
     // Setup and call create process.
     STARTUPINFOW si = { 0 };
     si.cb = sizeof(STARTUPINFOW);
+    wil::unique_process_information pi;
 
     // We start suspended so we can put it in the job before it does anything
     // We say new console so it doesn't run in the same window as our test.
@@ -237,46 +212,19 @@ MODULE_SETUP(ModuleSetup)
 
     // Wait a moment for the driver to be ready after freeing to attach.
     Sleep(1000);
+
     VERIFY_WIN32_BOOL_SUCCEEDED_RETURN(AttachConsole(dwFindPid));
 
-    int tries = 0;
-    while (tries < 5)
-    {
-        tries++;
-        Log::Comment(NoThrowString().Format(L"Attempt #%d to confirm we've attached", tries));
-
-        // Replace CRT handles
-        // These need to be reopened as read/write or they can affect some of the tests.
-        //
-        // std_out and std_in need to be closed when tests are finished, this is handled by the wil::scope_exit at the
-        // top of this file.
-        errno_t err = 0;
-        err = freopen_s(&std_out, "CONOUT$", "w+", stdout);
-        VERIFY_ARE_EQUAL(0, err);
-        err = freopen_s(&std_in, "CONIN$", "r+", stdin);
-        VERIFY_ARE_EQUAL(0, err);
-
-        // Now, try to get at the console we've set up. It's possible 1s wasn't long enough. If that was, we'll try again.
-
-        HANDLE const hOut = GetStdOutputHandle();
-        VERIFY_IS_NOT_NULL(hOut, L"Verify we have the standard output handle.");
-
-        CONSOLE_SCREEN_BUFFER_INFOEX csbiexBefore = { 0 };
-        csbiexBefore.cbSize = sizeof(csbiexBefore);
-        BOOL succeeded = GetConsoleScreenBufferInfoEx(hOut, &csbiexBefore);
-        if (!succeeded)
-        {
-            auto gle = GetLastError();
-            VERIFY_ARE_EQUAL(6u, gle, L"If we fail to set up the console, GetLastError should return 6 here.");
-            Sleep(1000);
-        }
-        else
-        {
-            break;
-        }
-    };
-
-    VERIFY_IS_LESS_THAN(tries, 5, L"Make sure we set up the new console in time");
+    // Replace CRT handles
+    // These need to be reopened as read/write or they can affect some of the tests.
+    //
+    // std_out and std_in need to be closed when tests are finished, this is handled by the wil::scope_exit at the
+    // top of this file.
+    errno_t err = 0;
+    err = freopen_s(&std_out, "CONOUT$", "w+", stdout);
+    VERIFY_ARE_EQUAL(0, err);
+    err = freopen_s(&std_in, "CONIN$", "r+", stdin);
+    VERIFY_ARE_EQUAL(0, err);
 
     return true;
 }

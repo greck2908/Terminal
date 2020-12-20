@@ -15,6 +15,7 @@ class UnicodeStorageTests
 {
     TEST_CLASS(UnicodeStorageTests);
 
+
     TEST_METHOD(CanOverwriteEmoji)
     {
         UnicodeStorage storage;

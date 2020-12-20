@@ -1,7 +1,6 @@
 @echo off
 
-rem bz - Build the entire solution without cleaning it first.
-rem This is another script to help Microsoft developers feel at home working on
-rem the terminal project.
+rem bcz - Build the project without clean it first
+rem This is another script to help Microsoft developers feel at home working on the openconsole project.
 
 call bcz no_clean %*

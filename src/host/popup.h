@@ -24,20 +24,29 @@ Revision History:
 #include "screenInfo.hpp"
 #include "readDataCooked.hpp"
 
+
+#define MINIMUM_COMMAND_PROMPT_SIZE 5
+
+
 class CommandHistory;
 
 class Popup
 {
 public:
-    static constexpr unsigned int MINIMUM_COMMAND_PROMPT_SIZE = 5;
 
     using UserInputFunction = std::function<NTSTATUS(COOKED_READ_DATA&, bool&, DWORD&, wchar_t&)>;
 
     Popup(SCREEN_INFORMATION& screenInfo, const COORD proposedSize);
     virtual ~Popup();
-    [[nodiscard]] virtual NTSTATUS Process(COOKED_READ_DATA& cookedReadData) noexcept = 0;
+    [[nodiscard]]
+    virtual NTSTATUS Process(COOKED_READ_DATA& cookedReadData) noexcept = 0;
 
     void Draw();
+
+    void UpdateStoredColors(const TextAttribute& newAttr,
+                            const TextAttribute& newPopupAttr,
+                            const TextAttribute& oldAttr,
+                            const TextAttribute& oldPopupAttr);
 
     void End();
 
@@ -57,13 +66,14 @@ protected:
     friend class CommandListPopupTests;
 #endif
 
-    [[nodiscard]] NTSTATUS _getUserInput(COOKED_READ_DATA& cookedReadData, bool& popupKey, DWORD& modifiers, wchar_t& wch) noexcept;
+    NTSTATUS _getUserInput(COOKED_READ_DATA& cookedReadData, bool& popupKey, DWORD& modifiers, wchar_t& wch) noexcept;
     void _DrawPrompt(const UINT id);
     virtual void _DrawContent() = 0;
 
-    SMALL_RECT _region; // region popup occupies
+
+    SMALL_RECT _region;  // region popup occupies
     SCREEN_INFORMATION& _screenInfo;
-    TextAttribute _attributes; // text attributes
+    TextAttribute _attributes;    // text attributes
 
 private:
     COORD _CalculateSize(const SCREEN_INFORMATION& screenInfo, const COORD proposedSize);
@@ -71,10 +81,10 @@ private:
 
     void _DrawBorder();
 
-    [[nodiscard]] static NTSTATUS _getUserInputInternal(COOKED_READ_DATA& cookedReadData,
-                                                        bool& popupKey,
-                                                        DWORD& modifiers,
-                                                        wchar_t& wch) noexcept;
+    static NTSTATUS _getUserInputInternal(COOKED_READ_DATA& cookedReadData,
+                                          bool& popupKey,
+                                          DWORD& modifiers,
+                                          wchar_t& wch) noexcept;
 
     OutputCellRect _oldContents; // contains data under popup
     COORD _oldScreenSize;

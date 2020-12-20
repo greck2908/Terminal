@@ -15,7 +15,6 @@
 #include <memory>
 
 using namespace WEX::Logging;
-using Microsoft::Console::Interactivity::ServiceLocator;
 
 class InputRecordConversionTests
 {

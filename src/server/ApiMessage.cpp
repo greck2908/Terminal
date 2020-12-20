@@ -8,7 +8,7 @@
 #include "ApiMessage.h"
 #include "DeviceComm.h"
 
-_CONSOLE_API_MSG::_CONSOLE_API_MSG() :
+_CONSOLE_API_MSG::_CONSOLE_API_MSG() : 
     _pDeviceComm(nullptr),
     _pApiRoutines(nullptr)
 {
@@ -17,12 +17,12 @@ _CONSOLE_API_MSG::_CONSOLE_API_MSG() :
 
 ConsoleProcessHandle* _CONSOLE_API_MSG::GetProcessHandle() const
 {
-    return reinterpret_cast<ConsoleProcessHandle*>(_pDeviceComm->GetHandle(Descriptor.Process));
+    return reinterpret_cast<ConsoleProcessHandle*>(Descriptor.Process);
 }
 
 ConsoleHandleData* _CONSOLE_API_MSG::GetObjectHandle() const
 {
-    return reinterpret_cast<ConsoleHandleData*>(_pDeviceComm->GetHandle(Descriptor.Object));
+    return reinterpret_cast<ConsoleHandleData*>(Descriptor.Object);
 }
 
 // Routine Description:
@@ -33,9 +33,10 @@ ConsoleHandleData* _CONSOLE_API_MSG::GetObjectHandle() const
 // - cbSize - Supplies the number of bytes to be read into the buffer.
 // Return Value:
 // - HRESULT indicating if the payload was successfully read.
-[[nodiscard]] HRESULT _CONSOLE_API_MSG::ReadMessageInput(const ULONG cbOffset,
-                                                         _Out_writes_bytes_(cbSize) PVOID pvBuffer,
-                                                         const ULONG cbSize)
+[[nodiscard]]
+HRESULT _CONSOLE_API_MSG::ReadMessageInput(const ULONG cbOffset,
+                                           _Out_writes_bytes_(cbSize) PVOID pvBuffer,
+                                           const ULONG cbSize)
 {
     CD_IO_OPERATION IoOperation;
     IoOperation.Identifier = Descriptor.Identifier;
@@ -55,8 +56,9 @@ ConsoleHandleData* _CONSOLE_API_MSG::GetObjectHandle() const
 // - Size - Receives the size, in bytes, of the input buffer.
 // Return Value:
 // -  HRESULT indicating if the input buffer was successfully retrieved.
-[[nodiscard]] HRESULT _CONSOLE_API_MSG::GetInputBuffer(_Outptr_result_bytebuffer_(*pcbSize) void** const ppvBuffer,
-                                                       _Out_ ULONG* const pcbSize)
+[[nodiscard]]
+HRESULT _CONSOLE_API_MSG::GetInputBuffer(_Outptr_result_bytebuffer_(*pcbSize) void** const ppvBuffer,
+                                         _Out_ ULONG* const pcbSize)
 {
     // Initialize the buffer if it hasn't been initialized yet.
     if (State.InputBuffer == nullptr)
@@ -91,9 +93,10 @@ ConsoleHandleData* _CONSOLE_API_MSG::GetObjectHandle() const
 // - Size - Receives the size, in bytes, of the output buffer.
 //  Return Value:
 // - HRESULT indicating if the output buffer was successfully retrieved.
-[[nodiscard]] HRESULT _CONSOLE_API_MSG::GetAugmentedOutputBuffer(const ULONG cbFactor,
-                                                                 _Outptr_result_bytebuffer_(*pcbSize) PVOID* const ppvBuffer,
-                                                                 _Out_ PULONG pcbSize)
+[[nodiscard]]
+HRESULT _CONSOLE_API_MSG::GetAugmentedOutputBuffer(const ULONG cbFactor,
+                                                   _Outptr_result_bytebuffer_(*pcbSize) PVOID * const ppvBuffer,
+                                                   _Out_ PULONG pcbSize)
 {
     // Initialize the buffer if it hasn't been initialized yet.
     if (State.OutputBuffer == nullptr)
@@ -103,7 +106,7 @@ ConsoleHandleData* _CONSOLE_API_MSG::GetObjectHandle() const
         ULONG cbWriteSize = Descriptor.OutputSize - State.WriteOffset;
         RETURN_IF_FAILED(ULongMult(cbWriteSize, cbFactor, &cbWriteSize));
 
-        BYTE* pPayload = new (std::nothrow) BYTE[cbWriteSize];
+        BYTE* pPayload = new(std::nothrow) BYTE[cbWriteSize];
         RETURN_IF_NULL_ALLOC(pPayload);
         ZeroMemory(pPayload, sizeof(BYTE) * cbWriteSize);
 
@@ -127,8 +130,9 @@ ConsoleHandleData* _CONSOLE_API_MSG::GetObjectHandle() const
 // - Size - Receives the size, in bytes, of the output buffer.
 // Return Value:
 // - HRESULT indicating if the output buffer was successfully retrieved.
-[[nodiscard]] HRESULT _CONSOLE_API_MSG::GetOutputBuffer(_Outptr_result_bytebuffer_(*pcbSize) void** const ppvBuffer,
-                                                        _Out_ ULONG* const pcbSize)
+[[nodiscard]]
+HRESULT _CONSOLE_API_MSG::GetOutputBuffer(_Outptr_result_bytebuffer_(*pcbSize) void** const ppvBuffer,
+                                          _Out_ ULONG * const pcbSize)
 {
     return GetAugmentedOutputBuffer(1, ppvBuffer, pcbSize);
 }
@@ -142,13 +146,14 @@ ConsoleHandleData* _CONSOLE_API_MSG::GetObjectHandle() const
 // - <none>
 // Return Value:
 // - HRESULT indicating if the payload was successfully written if applicable.
-[[nodiscard]] HRESULT _CONSOLE_API_MSG::ReleaseMessageBuffers()
+[[nodiscard]]
+HRESULT _CONSOLE_API_MSG::ReleaseMessageBuffers()
 {
     HRESULT hr = S_OK;
 
     if (State.InputBuffer != nullptr)
     {
-        delete[] static_cast<BYTE*>(State.InputBuffer);
+        delete[] State.InputBuffer;
         State.InputBuffer = nullptr;
     }
 
@@ -165,7 +170,7 @@ ConsoleHandleData* _CONSOLE_API_MSG::GetObjectHandle() const
             LOG_IF_FAILED(_pDeviceComm->WriteOutput(&IoOperation));
         }
 
-        delete[] static_cast<BYTE*>(State.OutputBuffer);
+        delete[] State.OutputBuffer;
         State.OutputBuffer = nullptr;
     }
 

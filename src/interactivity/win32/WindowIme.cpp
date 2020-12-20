@@ -3,7 +3,7 @@
 
 #include "precomp.h"
 
-#include "../inc/ServiceLocator.hpp"
+#include "..\inc\ServiceLocator.hpp"
 
 #include "window.hpp"
 
@@ -18,7 +18,6 @@
 // - Rectangle specifying current command line edit area.
 RECT GetImeSuggestionWindowPos()
 {
-    using Microsoft::Console::Interactivity::ServiceLocator;
     const CONSOLE_INFORMATION& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
     const auto& screenBuffer = gci.GetActiveOutputBuffer();
 

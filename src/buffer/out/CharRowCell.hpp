@@ -17,7 +17,7 @@ Author(s):
 #pragma once
 
 #include "DbcsAttribute.hpp"
-#include "unicode.hpp"
+
 
 #if (defined(_M_IX86) || defined(_M_AMD64))
 // currently CharRowCell's fields use 3 bytes of memory, leaving the 4th byte in unused. this leads
@@ -25,18 +25,14 @@ Author(s):
 #pragma pack(push, 1)
 #endif
 
+
 class CharRowCell final
 {
 public:
-    CharRowCell() noexcept = default;
-    CharRowCell(const wchar_t wch, const DbcsAttribute attr) noexcept
-        :
-        _wch(wch),
-        _attr(attr)
-    {
-    }
+    CharRowCell();
+    CharRowCell(const wchar_t wch, const DbcsAttribute attr);
 
-    void EraseChars() noexcept;
+    void EraseChars();
     void Reset() noexcept;
 
     bool IsSpace() const noexcept;
@@ -48,10 +44,9 @@ public:
     const wchar_t& Char() const noexcept;
 
     friend constexpr bool operator==(const CharRowCell& a, const CharRowCell& b) noexcept;
-
 private:
-    wchar_t _wch{ UNICODE_SPACE };
-    DbcsAttribute _attr{};
+    wchar_t _wch;
+    DbcsAttribute _attr;
 };
 
 #if (defined(_M_IX86) || defined(_M_AMD64))

@@ -4,7 +4,9 @@
 #include "precomp.h"
 #include "cpl_core.h"
 
+
 HINSTANCE ghInstance;
+
 
 /*************************************************************\
  *  DllInitialize()
@@ -21,8 +23,7 @@ BOOL WINAPI DllMain(
     DWORD dwReason,
     LPVOID /*lpvReserved*/)
 {
-    if (dwReason != DLL_PROCESS_ATTACH)
-    {
+    if (dwReason != DLL_PROCESS_ATTACH) {
         return TRUE;
     }
 
@@ -32,6 +33,7 @@ BOOL WINAPI DllMain(
 
     return TRUE;
 }
+
 
 /*************************************************************\
  *  CPlApplet()
@@ -55,13 +57,13 @@ LONG CPlApplet(
     LPNEWCPLINFO lpCPlInfo;
     INITCOMMONCONTROLSEX iccex;
 
-    switch (wMsg)
-    {
+    switch (wMsg) {
+
     case CPL_INIT:
 
         iccex.dwSize = sizeof(iccex);
-        iccex.dwICC = ICC_WIN95_CLASSES;
-        InitCommonControlsEx(&iccex);
+        iccex.dwICC  = ICC_WIN95_CLASSES;
+        InitCommonControlsEx( &iccex );
 
         return InitializeConsoleState();
 
@@ -75,22 +77,22 @@ LONG CPlApplet(
         lpOldCPlInfo->idIcon = IDI_CONSOLE;
         lpOldCPlInfo->idName = IDS_NAME;
         lpOldCPlInfo->idInfo = IDS_INFO;
-        lpOldCPlInfo->lData = 0;
+        lpOldCPlInfo->lData  = 0;
         return TRUE;
 
     case CPL_NEWINQUIRE:
 
         lpCPlInfo = (LPNEWCPLINFO)lParam2;
 
-        lpCPlInfo->hIcon = LoadIcon(nullptr, MAKEINTRESOURCE(IDI_CONSOLE));
+        lpCPlInfo->hIcon = LoadIcon(NULL, MAKEINTRESOURCE(IDI_CONSOLE));
 
-        if (!LoadString(ghInstance, IDS_NAME, lpCPlInfo->szName, ARRAYSIZE(lpCPlInfo->szName)))
-        {
+        if (!LoadString(ghInstance, IDS_NAME, lpCPlInfo->szName,
+                        ARRAYSIZE(lpCPlInfo->szName))) {
             lpCPlInfo->szName[0] = TEXT('\0');
         }
 
-        if (!LoadString(ghInstance, IDS_INFO, lpCPlInfo->szInfo, ARRAYSIZE(lpCPlInfo->szInfo)))
-        {
+        if (!LoadString(ghInstance, IDS_INFO, lpCPlInfo->szInfo,
+                        ARRAYSIZE(lpCPlInfo->szInfo))) {
             lpCPlInfo->szInfo[0] = TEXT('\0');
         }
 

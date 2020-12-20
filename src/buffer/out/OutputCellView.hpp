@@ -25,10 +25,11 @@ Revision History:
 class OutputCellView
 {
 public:
+
     OutputCellView(const std::wstring_view view,
                    const DbcsAttribute dbcsAttr,
                    const TextAttribute textAttr,
-                   const TextAttributeBehavior behavior) noexcept;
+                   const TextAttributeBehavior behavior);
 
     const std::wstring_view& Chars() const noexcept;
     size_t Columns() const noexcept;

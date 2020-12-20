@@ -3,7 +3,7 @@
 
 #include "precomp.h"
 #include "WexTestClass.h"
-#include "../../inc/consoletaeftemplates.hpp"
+#include "..\..\inc\consoletaeftemplates.hpp"
 
 #include "CommonState.hpp"
 
@@ -12,12 +12,11 @@
 #include "selection.hpp"
 #include "cmdline.h"
 
-#include "../interactivity/inc/ServiceLocator.hpp"
+#include "..\interactivity\inc\ServiceLocator.hpp"
 
 using namespace WEX::Common;
 using namespace WEX::Logging;
 using namespace WEX::TestExecution;
-using Microsoft::Console::Interactivity::ServiceLocator;
 
 class SelectionTests
 {
@@ -323,7 +322,7 @@ class SelectionTests
 
         // selection rectangle starts from the target and goes for the length requested
         srSelection.Left = coordTargetPoint.X;
-        srSelection.Right = coordTargetPoint.X + sStringLength;
+        srSelection.Right = coordTargetPoint.X + sStringLength - 1;
 
         // save original for comparison
         srOriginal.Top = srSelection.Top;
@@ -331,12 +330,7 @@ class SelectionTests
         srOriginal.Left = srSelection.Left;
         srOriginal.Right = srSelection.Right;
 
-        COORD startPos{ sTargetX, sTargetY };
-        COORD endPos{ base::ClampAdd(sTargetX, sLength), sTargetY };
-        const auto selectionRects = screenInfo.GetTextBuffer().GetTextRects(startPos, endPos);
-
-        VERIFY_ARE_EQUAL(static_cast<size_t>(1), selectionRects.size());
-        srSelection = selectionRects.at(0);
+        srSelection = Selection::s_BisectSelection(sStringLength, coordTargetPoint, screenInfo, srSelection);
 
         VERIFY_ARE_EQUAL(srOriginal.Top, srSelection.Top);
         VERIFY_ARE_EQUAL(srOriginal.Bottom, srSelection.Bottom);
@@ -383,10 +377,10 @@ class SelectionTests
 
         // start from position 10 before end of row (80 length row)
         // row is 2
-        // selection is 9 characters long
+        // selection is 10 characters long
         // the left edge shouldn't move
         // the right edge should move one to the left (-1) to not select the leading byte
-        TestBisectSelectionDelta(70, 2, 9, 0, -1);
+        TestBisectSelectionDelta(70, 2, 10, 0, -1);
 
         // 2b. End position is leading half and is elsewhere in the row
 
@@ -394,16 +388,16 @@ class SelectionTests
         // row is 2
         // selection is 10 characters long
         // the left edge shouldn't move
-        // the right edge should not move, because it is already on the trailing byte
-        TestBisectSelectionDelta(58, 2, 10, 0, 0);
+        // the right edge should move one to the right (+1) to add the trailing byte to the selection
+        TestBisectSelectionDelta(58, 2, 10, 0, 1);
 
         // 2c. End position is leading half and is at end of buffer
         // start from position 10 before end of row (80 length row)
         // row is 300 (or 299 for the index)
-        // selection is 9 characters long
+        // selection is 10 characters long
         // the left edge shouldn't move
-        // the right edge should move one to the left (-1) to not select the leading byte
-        TestBisectSelectionDelta(70, 299, 9, 0, -1);
+        // the right edge shouldn't move
+        TestBisectSelectionDelta(70, 299, 10, 0, 0);
     }
 };
 
@@ -419,7 +413,6 @@ class SelectionInputTests
 
         m_state->PrepareGlobalFont();
         m_state->PrepareGlobalScreenBuffer();
-        m_state->PrepareGlobalInputBuffer();
 
         return true;
     }
@@ -428,7 +421,6 @@ class SelectionInputTests
     {
         m_state->CleanupGlobalScreenBuffer();
         m_state->CleanupGlobalFont();
-        m_state->CleanupGlobalInputBuffer();
 
         delete m_state;
 
@@ -620,4 +612,5 @@ class SelectionInputTests
 
         } while (point.Y < bufferSize.BottomInclusive()); // stop once we've advanced to a point on the bottom row of the buffer.
     }
+
 };

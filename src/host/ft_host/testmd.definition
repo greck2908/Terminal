@@ -1,12 +1,12 @@
 {
-  "$schema": "http://universaltest/schema/testmddefinition-5.json",
+  "$schema": "http://universaltest/schema/testmddefinition-2.json",
   "Package": {
     "ComponentName": "Console",
     "SubComponentName": "Host-FeatureTests"
   },
   "Execution": {
     "Type": "TAEF",
-    "Parameter": "/ScreenCaptureOnError /miniDumpOnError /unsupported_miniDumpOnTimeout"
+    "Parameter": "/ScreenCaptureOnError"
   },
   "Dependencies": {
     "Files": [ 
@@ -30,7 +30,6 @@
       "AdditionalPlugins": [
         {
           "Type": "Microsoft.TestInfrastructure.UniversalTest.TestMD.Plugins.Winperf.WinperfPlugin",
-          "Role": "Default",
           "Parameters": {
             "MachineConfigurationParameter": "none",
             "LocalReproUpload": "true"

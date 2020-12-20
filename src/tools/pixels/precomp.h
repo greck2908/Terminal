@@ -9,7 +9,7 @@
 #include <nturtl.h>
 #include <windows.h>
 
-#include <cstdio>
+#include <stdio.h>
 #include <shlwapi.h>
 #include <propvarutil.h>
 #include <initguid.h>
@@ -22,9 +22,9 @@
 #include <sal.h>
 
 // Standard library C-style
-#include <cwchar>
-#include <cstdlib>
-#include <cstdio>
+#include <wchar.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 // This includes support libraries from the CRT, STL, WIL, and GSL
 #include "LibraryIncludes.h"

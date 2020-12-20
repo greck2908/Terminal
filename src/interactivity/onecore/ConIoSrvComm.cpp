@@ -6,11 +6,11 @@
 #include "ConIoSrvComm.hpp"
 #include "ConIoSrv.h"
 
-#include "../../host/dbcs.h"
-#include "../../host/input.h"
-#include "../../types/inc/IInputEvent.hpp"
+#include "..\..\host\dbcs.h"
+#include "..\..\host\input.h"
+#include "..\..\types\inc\IInputEvent.hpp"
 
-#include "../inc/ServiceLocator.hpp"
+#include "..\inc\ServiceLocator.hpp"
 
 #pragma hdrstop
 
@@ -21,11 +21,10 @@
 extern void LockConsole();
 extern void UnlockConsole();
 
-using namespace Microsoft::Console::Render;
 using namespace Microsoft::Console::Interactivity::OneCore;
 
 ConIoSrvComm::ConIoSrvComm() :
-    _inputPipeThreadHandle(nullptr),
+    _inputPipeThreadHandle(INVALID_HANDLE_VALUE),
     _pipeReadHandle(INVALID_HANDLE_VALUE),
     _pipeWriteHandle(INVALID_HANDLE_VALUE),
     _alpcClientCommunicationPort(INVALID_HANDLE_VALUE),
@@ -35,18 +34,19 @@ ConIoSrvComm::ConIoSrvComm() :
     _fIsInputInitialized(false),
     pWddmConEngine(nullptr)
 {
+
 }
 
 ConIoSrvComm::~ConIoSrvComm()
 {
     // Cancel pending IOs on the input thread that might get us stuck.
-    if (_inputPipeThreadHandle)
+    if (INVALID_HANDLE_VALUE != _inputPipeThreadHandle)
     {
         LOG_IF_WIN32_BOOL_FALSE(CancelSynchronousIo(_inputPipeThreadHandle));
         CloseHandle(_inputPipeThreadHandle);
-        _inputPipeThreadHandle = nullptr;
+        _inputPipeThreadHandle = INVALID_HANDLE_VALUE;
     }
-
+    
     // Free any handles we might have open.
     if (INVALID_HANDLE_VALUE != _pipeReadHandle)
     {
@@ -69,7 +69,8 @@ ConIoSrvComm::~ConIoSrvComm()
 
 #pragma region Communication
 
-[[nodiscard]] NTSTATUS ConIoSrvComm::Connect()
+[[nodiscard]]
+NTSTATUS ConIoSrvComm::Connect()
 {
     BOOL Ret = TRUE;
     NTSTATUS Status = STATUS_SUCCESS;
@@ -100,7 +101,7 @@ ConIoSrvComm::~ConIoSrvComm()
 
     // Initialize the server port name.
     Ret = RtlCreateUnicodeString(&PortName, CIS_ALPC_PORT_NAME);
-    if (!Ret)
+    if (Ret == FALSE)
     {
         return STATUS_NO_MEMORY;
     }
@@ -113,7 +114,8 @@ ConIoSrvComm::~ConIoSrvComm()
                                NULL);
 
     // Initialize the connection message attributes.
-    PALPC_MESSAGE_ATTRIBUTES ConnectionMessageAttributes = (PALPC_MESSAGE_ATTRIBUTES)&ConnectionMessageAttributesBuffer;
+    PALPC_MESSAGE_ATTRIBUTES ConnectionMessageAttributes
+        = (PALPC_MESSAGE_ATTRIBUTES)&ConnectionMessageAttributesBuffer;
 
     Status = AlpcInitializeMessageAttribute(CIS_MSG_ATTR_FLAGS,
                                             ConnectionMessageAttributes,
@@ -130,7 +132,7 @@ ConIoSrvComm::~ConIoSrvComm()
 
     // Set up the port attributes.
     PortAttributes.Flags = ALPC_PORFLG_ACCEPT_DUP_HANDLES |
-                           ALPC_PORFLG_ACCEPT_INDIRECT_HANDLES;
+        ALPC_PORFLG_ACCEPT_INDIRECT_HANDLES;
     PortAttributes.MaxMessageLength = sizeof(CIS_MSG);
     PortAttributes.MaxPoolUsage = 0x4000;
     PortAttributes.MaxSectionSize = 0;
@@ -220,7 +222,8 @@ ConIoSrvComm::~ConIoSrvComm()
     return Status;
 }
 
-[[nodiscard]] NTSTATUS ConIoSrvComm::EnsureConnection()
+[[nodiscard]]
+NTSTATUS ConIoSrvComm::EnsureConnection()
 {
     NTSTATUS Status;
 
@@ -239,7 +242,7 @@ ConIoSrvComm::~ConIoSrvComm()
 VOID ConIoSrvComm::ServiceInputPipe()
 {
     // Save off a handle to the thread that is coming in here in case it gets blocked and we need to tear down.
-    THROW_HR_IF(E_NOT_VALID_STATE, !!_inputPipeThreadHandle); // We can't store two of them, so it's invalid if there are two.
+    THROW_HR_IF(E_NOT_VALID_STATE, INVALID_HANDLE_VALUE != _inputPipeThreadHandle); // We can't store two of them, so it's invalid if there are two.
     THROW_IF_WIN32_BOOL_FALSE(DuplicateHandle(GetCurrentProcess(),
                                               GetCurrentThread(),
                                               GetCurrentProcess(),
@@ -247,7 +250,7 @@ VOID ConIoSrvComm::ServiceInputPipe()
                                               0,
                                               FALSE,
                                               DUPLICATE_SAME_ACCESS));
-
+    
     BOOL Ret;
 
     CIS_EVENT Event = { 0 };
@@ -292,7 +295,8 @@ VOID ConIoSrvComm::ServiceInputPipe()
     }
 }
 
-[[nodiscard]] NTSTATUS ConIoSrvComm::SendRequestReceiveReply(PCIS_MSG Message) const
+[[nodiscard]]
+NTSTATUS ConIoSrvComm::SendRequestReceiveReply(PCIS_MSG Message) const
 {
     NTSTATUS Status;
 
@@ -322,7 +326,7 @@ VOID ConIoSrvComm::ServiceInputPipe()
 VOID ConIoSrvComm::HandleFocusEvent(PCIS_EVENT Event)
 {
     BOOL Ret;
-    IRenderer* Renderer;
+    IRenderer *Renderer;
     CIS_EVENT ReplyEvent;
 
     Renderer = ServiceLocator::LocateGlobals().pRender;
@@ -464,7 +468,8 @@ VOID ConIoSrvComm::CleanupForHeadless(const NTSTATUS status)
 
 #pragma region Request Methods
 
-[[nodiscard]] NTSTATUS ConIoSrvComm::RequestGetDisplaySize(_Inout_ PCD_IO_DISPLAY_SIZE pCdDisplaySize) const
+[[nodiscard]]
+NTSTATUS ConIoSrvComm::RequestGetDisplaySize(_Inout_ PCD_IO_DISPLAY_SIZE pCdDisplaySize) const
 {
     NTSTATUS Status;
 
@@ -481,7 +486,8 @@ VOID ConIoSrvComm::CleanupForHeadless(const NTSTATUS status)
     return Status;
 }
 
-[[nodiscard]] NTSTATUS ConIoSrvComm::RequestGetFontSize(_Inout_ PCD_IO_FONT_SIZE pCdFontSize) const
+[[nodiscard]]
+NTSTATUS ConIoSrvComm::RequestGetFontSize(_Inout_ PCD_IO_FONT_SIZE pCdFontSize) const
 {
     NTSTATUS Status;
 
@@ -498,7 +504,8 @@ VOID ConIoSrvComm::CleanupForHeadless(const NTSTATUS status)
     return Status;
 }
 
-[[nodiscard]] NTSTATUS ConIoSrvComm::RequestSetCursor(_In_ CD_IO_CURSOR_INFORMATION* const pCdCursorInformation) const
+[[nodiscard]]
+NTSTATUS ConIoSrvComm::RequestSetCursor(_In_ CD_IO_CURSOR_INFORMATION* const pCdCursorInformation) const
 {
     NTSTATUS Status;
 
@@ -515,7 +522,8 @@ VOID ConIoSrvComm::CleanupForHeadless(const NTSTATUS status)
     return Status;
 }
 
-[[nodiscard]] NTSTATUS ConIoSrvComm::RequestUpdateDisplay(_In_ SHORT RowIndex) const
+[[nodiscard]]
+NTSTATUS ConIoSrvComm::RequestUpdateDisplay(_In_ SHORT RowIndex) const
 {
     NTSTATUS Status;
 
@@ -532,7 +540,8 @@ VOID ConIoSrvComm::CleanupForHeadless(const NTSTATUS status)
     return Status;
 }
 
-[[nodiscard]] NTSTATUS ConIoSrvComm::RequestMapVirtualKey(_In_ UINT uCode, _In_ UINT uMapType, _Out_ UINT* puReturnValue)
+[[nodiscard]]
+NTSTATUS ConIoSrvComm::RequestMapVirtualKey(_In_ UINT uCode, _In_ UINT uMapType, _Out_ UINT* puReturnValue)
 {
     NTSTATUS Status;
 
@@ -554,7 +563,8 @@ VOID ConIoSrvComm::CleanupForHeadless(const NTSTATUS status)
     return Status;
 }
 
-[[nodiscard]] NTSTATUS ConIoSrvComm::RequestVkKeyScan(_In_ WCHAR wCharacter, _Out_ SHORT* psReturnValue)
+[[nodiscard]]
+NTSTATUS ConIoSrvComm::RequestVkKeyScan(_In_ WCHAR wCharacter, _Out_ SHORT* psReturnValue)
 {
     NTSTATUS Status;
 
@@ -575,7 +585,8 @@ VOID ConIoSrvComm::CleanupForHeadless(const NTSTATUS status)
     return Status;
 }
 
-[[nodiscard]] NTSTATUS ConIoSrvComm::RequestGetKeyState(_In_ int iVirtualKey, _Out_ SHORT* psReturnValue)
+[[nodiscard]]
+NTSTATUS ConIoSrvComm::RequestGetKeyState(_In_ int iVirtualKey, _Out_ SHORT *psReturnValue)
 {
     NTSTATUS Status;
 
@@ -596,7 +607,8 @@ VOID ConIoSrvComm::CleanupForHeadless(const NTSTATUS status)
     return Status;
 }
 
-[[nodiscard]] USHORT ConIoSrvComm::GetDisplayMode() const
+[[nodiscard]]
+USHORT ConIoSrvComm::GetDisplayMode() const
 {
     return _displayMode;
 }
@@ -658,7 +670,7 @@ SHORT ConIoSrvComm::GetKeyState(int nVirtKey)
     return ReturnValue;
 }
 
-BOOL ConIoSrvComm::TranslateCharsetInfo(DWORD* lpSrc, LPCHARSETINFO lpCs, DWORD dwFlags)
+BOOL ConIoSrvComm::TranslateCharsetInfo(DWORD * lpSrc, LPCHARSETINFO lpCs, DWORD dwFlags)
 {
     SetLastError(ERROR_SUCCESS);
 
@@ -690,13 +702,15 @@ BOOL ConIoSrvComm::TranslateCharsetInfo(DWORD* lpSrc, LPCHARSETINFO lpCs, DWORD 
 
 #pragma endregion
 
-[[nodiscard]] NTSTATUS ConIoSrvComm::InitializeBgfx()
+
+[[nodiscard]]
+NTSTATUS ConIoSrvComm::InitializeBgfx()
 {
     NTSTATUS Status;
 
     Globals& globals = ServiceLocator::LocateGlobals();
     FAIL_FAST_IF_NULL(globals.pRender);
-    IWindowMetrics* const Metrics = ServiceLocator::LocateWindowMetrics();
+    IWindowMetrics * const Metrics = ServiceLocator::LocateWindowMetrics();
 
     // Fetch the display size from the console driver.
     const RECT DisplaySize = Metrics->GetMaxClientRectInPixels();
@@ -731,7 +745,8 @@ BOOL ConIoSrvComm::TranslateCharsetInfo(DWORD* lpSrc, LPCHARSETINFO lpCs, DWORD 
     return Status;
 }
 
-[[nodiscard]] NTSTATUS ConIoSrvComm::InitializeWddmCon()
+[[nodiscard]]
+NTSTATUS ConIoSrvComm::InitializeWddmCon()
 {
     Globals& globals = ServiceLocator::LocateGlobals();
     FAIL_FAST_IF_NULL(globals.pRender);

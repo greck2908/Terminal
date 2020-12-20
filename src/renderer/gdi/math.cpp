@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
+
 #include "precomp.h"
 
 #include "gdirenderer.hpp"
@@ -16,25 +17,26 @@ using namespace Microsoft::Console::Render;
 // Return Value:
 // - The character dimensions of the current dirty area of the frame.
 //      This is an Inclusive rect.
-std::vector<til::rectangle> GdiEngine::GetDirtyArea()
+SMALL_RECT GdiEngine::GetDirtyRectInChars()
 {
     RECT rc = _psInvalidData.rcPaint;
 
     SMALL_RECT sr = { 0 };
     LOG_IF_FAILED(_ScaleByFont(&rc, &sr));
 
-    return { sr };
+    return sr;
 }
 
 // Routine Description:
-// - Uses the currently selected font to determine how wide the given character will be when rendered.
+// - Uses the currently selected font to determine how wide the given character will be when renderered.
 // - NOTE: Only supports determining half-width/full-width status for CJK-type languages (e.g. is it 1 character wide or 2. a.k.a. is it a rectangle or square.)
 // Arguments:
 // - glyph - utf16 encoded codepoint to check
-// - pResult - receives return value, True if it is full-width (2 wide). False if it is half-width (1 wide).
+// - pResult - recieves return value, True if it is full-width (2 wide). False if it is half-width (1 wide).
 // Return Value:
 // - S_OK
-[[nodiscard]] HRESULT GdiEngine::IsGlyphWideByFont(const std::wstring_view glyph, _Out_ bool* const pResult) noexcept
+[[nodiscard]]
+HRESULT GdiEngine::IsGlyphWideByFont(const std::wstring_view glyph, _Out_ bool* const pResult) noexcept
 {
     bool isFullWidth = false;
 
@@ -78,7 +80,8 @@ std::vector<til::rectangle> GdiEngine::GetDirtyArea()
 // - prc - Pixel region (RECT) for drawing to the client surface.
 // Return Value:
 // - S_OK or safe math failure value.
-[[nodiscard]] HRESULT GdiEngine::_ScaleByFont(const SMALL_RECT* const psr, _Out_ RECT* const prc) const noexcept
+[[nodiscard]]
+HRESULT GdiEngine::_ScaleByFont(const SMALL_RECT* const psr, _Out_ RECT* const prc) const noexcept
 {
     COORD const coordFontSize = _GetFontSize();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), coordFontSize.X == 0 || coordFontSize.Y == 0);
@@ -101,7 +104,8 @@ std::vector<til::rectangle> GdiEngine::GetDirtyArea()
 // - ppt - Pixel coordinate (POINT) for drawing to the client surface.
 // Return Value:
 // - S_OK or safe math failure value.
-[[nodiscard]] HRESULT GdiEngine::_ScaleByFont(const COORD* const pcoord, _Out_ POINT* const pPoint) const noexcept
+[[nodiscard]]
+HRESULT GdiEngine::_ScaleByFont(const COORD* const pcoord, _Out_ POINT* const pPoint) const noexcept
 {
     COORD const coordFontSize = _GetFontSize();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), coordFontSize.X == 0 || coordFontSize.Y == 0);
@@ -122,7 +126,8 @@ std::vector<til::rectangle> GdiEngine::GetDirtyArea()
 // - psr - Character region (SMALL_RECT) from the console text buffer.
 // Return Value:
 // - S_OK or safe math failure value.
-[[nodiscard]] HRESULT GdiEngine::_ScaleByFont(const RECT* const prc, _Out_ SMALL_RECT* const psr) const noexcept
+[[nodiscard]]
+HRESULT GdiEngine::_ScaleByFont(const RECT* const prc, _Out_ SMALL_RECT* const psr) const noexcept
 {
     COORD const coordFontSize = _GetFontSize();
     RETURN_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_STATE), coordFontSize.X == 0 || coordFontSize.Y == 0);
@@ -149,6 +154,7 @@ std::vector<til::rectangle> GdiEngine::GetDirtyArea()
     // (8px + 8px) / 8px = 2ch for the Right measurement. Now we're redrawing 2 chars when we only needed to do one because this caused us to effectively round up.
     // C Conclusion = this works because our addition can never completely push us over to adding an additional ch to the rectangle.
     // So the algorithm below is using the C conclusion's math.
+
 
     // Do math as long and fit to short at the end.
     LONG lRight = prc->right;

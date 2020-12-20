@@ -28,26 +28,28 @@ Author(s):
 class FontInfo : public FontInfoBase
 {
 public:
-    FontInfo(const std::wstring_view faceName,
-             const unsigned char family,
-             const unsigned int weight,
+    FontInfo(_In_ PCWSTR const pwszFaceName,
+             const BYTE bFamily,
+             const LONG lWeight,
              const COORD coordSize,
-             const unsigned int codePage,
+             const UINT uiCodePage,
              const bool fSetDefaultRasterFont = false);
 
-    FontInfo(const FontInfo& fiFont);
+    FontInfo(const FontInfo &fiFont);
 
     COORD GetSize() const;
     COORD GetUnscaledSize() const;
 
-    void SetFromEngine(const std::wstring_view faceName,
-                       const unsigned char family,
-                       const unsigned int weight,
+    void SetFromEngine(_In_ PCWSTR const pwszFaceName,
+                       const BYTE bFamily,
+                       const LONG lWeight,
                        const bool fSetDefaultRasterFont,
                        const COORD coordSize,
                        const COORD coordSizeUnscaled);
 
     void ValidateFont();
+
+    static void s_SetFontDefaultList(_In_ Microsoft::Console::Render::IFontDefaultList* const pFontDefaultList);
 
     friend bool operator==(const FontInfo& a, const FontInfo& b);
 
@@ -59,5 +61,6 @@ private:
 };
 
 bool operator==(const FontInfo& a, const FontInfo& b);
+
 
 // SET AND UNSET CONSOLE_OEMFONT_DISPLAY unless we can get rid of the stupid recoding in the conhost side.

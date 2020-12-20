@@ -62,9 +62,10 @@ public:
 
     void ProcessAliases(DWORD& lineCount);
 
-    [[nodiscard]] HRESULT Read(const bool isUnicode,
-                               size_t& numBytes,
-                               ULONG& controlKeyState) noexcept;
+    [[nodiscard]]
+    HRESULT Read(const bool isUnicode,
+                 size_t& numBytes,
+                 ULONG& controlKeyState) noexcept;
 
     bool ProcessInput(const wchar_t wch,
                       const DWORD keyState,
@@ -106,6 +107,7 @@ public:
     size_t SavePromptToUserBuffer(const size_t cch);
     void SavePendingInput(const size_t cch, const bool multiline);
 
+
 #if UNIT_TESTING
     friend class CommandLineTests;
     friend class CopyToCharPopupTests;
@@ -119,14 +121,14 @@ private:
     size_t _bytesRead;
 
     // insertion position into the buffer (where the conceptual prompt cursor is)
-    size_t _currentPosition; // char position, not byte position
+    size_t _currentPosition;  // char position, not byte position
 
     wchar_t* _bufPtr; // current position to insert chars at
 
     // should be const. the first char of the buffer
     wchar_t* _backupLimit;
 
-    size_t _userBufferSize; // doubled size in ansi case
+    size_t _userBufferSize;   // doubled size in ansi case
     wchar_t* _userBuffer;
 
     size_t* _pdwNumBytes;
@@ -154,7 +156,9 @@ private:
     bool _insertMode;
     bool _unicode;
 
-    [[nodiscard]] NTSTATUS _readCharInputLoop(const bool isUnicode, size_t& numBytes) noexcept;
+    [[nodiscard]]
+    NTSTATUS _readCharInputLoop(const bool isUnicode, size_t& numBytes) noexcept;
 
-    [[nodiscard]] NTSTATUS _handlePostCharInputLoop(const bool isUnicode, size_t& numBytes, ULONG& controlKeyState) noexcept;
+    [[nodiscard]]
+    NTSTATUS _handlePostCharInputLoop(const bool isUnicode, size_t& numBytes, ULONG& controlKeyState) noexcept;
 };

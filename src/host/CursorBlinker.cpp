@@ -5,9 +5,7 @@
 #include "../host/scrolling.hpp"
 #include "../interactivity/inc/ServiceLocator.hpp"
 #pragma hdrstop
-
 using namespace Microsoft::Console;
-using namespace Microsoft::Console::Interactivity;
 
 CursorBlinker::CursorBlinker() :
     _hCaretBlinkTimer(INVALID_HANDLE_VALUE),
@@ -28,12 +26,6 @@ void CursorBlinker::UpdateSystemMetrics()
 {
     // This can be -1 in a TS session
     _uCaretBlinkTime = ServiceLocator::LocateSystemConfigurationProvider()->GetCaretBlinkTime();
-
-    // If animations are disabled, or the blink rate is infinite, blinking is not allowed.
-    BOOL animationsEnabled = TRUE;
-    SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animationsEnabled, 0);
-    auto& blinkingState = ServiceLocator::LocateGlobals().getConsoleInformation().GetBlinkingState();
-    blinkingState.SetBlinkingAllowed(animationsEnabled && _uCaretBlinkTime != INFINITE);
 }
 
 void CursorBlinker::SettingsChanged()
@@ -59,8 +51,7 @@ void CursorBlinker::FocusStart()
 }
 
 // Routine Description:
-// - This routine is called when the timer in the console with the focus goes off.
-//   It blinks the cursor and also toggles the rendition of any blinking attributes.
+// - This routine is called when the timer in the console with the focus goes off.  It blinks the cursor.
 // Arguments:
 // - ScreenInfo - reference to screen info structure.
 // Return Value:
@@ -116,16 +107,16 @@ void CursorBlinker::TimerRoutine(SCREEN_INFORMATION& ScreenInfo)
     if (cursor.GetDelay())
     {
         cursor.SetDelay(false);
-        goto DoBlinkingRenditionAndScroll;
+        goto DoScroll;
     }
 
     // Don't blink the cursor for remote sessions.
     if ((!ServiceLocator::LocateSystemConfigurationProvider()->IsCaretBlinkingEnabled() ||
          _uCaretBlinkTime == -1 ||
-         (!cursor.IsBlinkingAllowed())) &&
-        cursor.IsOn())
+        (!cursor.IsBlinkingAllowed())) &&
+       cursor.IsOn())
     {
-        goto DoBlinkingRenditionAndScroll;
+        goto DoScroll;
     }
 
     // Blink only if the cursor isn't turned off via the API
@@ -134,14 +125,11 @@ void CursorBlinker::TimerRoutine(SCREEN_INFORMATION& ScreenInfo)
         cursor.SetIsOn(!cursor.IsOn());
     }
 
-DoBlinkingRenditionAndScroll:
-    gci.GetBlinkingState().ToggleBlinkingRendition(ScreenInfo.GetRenderTarget());
-
 DoScroll:
     Scrolling::s_ScrollIfNecessary(ScreenInfo);
 }
 
-void CALLBACK CursorTimerRoutineWrapper(_In_ PVOID /* lpParam */, _In_ BOOLEAN /* TimerOrWaitFired */)
+void CALLBACK CursorTimerRoutineWrapper(_In_ PVOID /* lpParam */, _In_ BOOL /* TimerOrWaitFired */)
 {
     // Suppose the following sequence of events takes place:
     //
@@ -204,7 +192,7 @@ void CursorBlinker::SetCaretTimer()
 
         bRet = CreateTimerQueueTimer(&_hCaretBlinkTimer,
                                      _hCaretBlinkTimerQueue,
-                                     CursorTimerRoutineWrapper,
+                                     (WAITORTIMERCALLBACKFUNC)CursorTimerRoutineWrapper,
                                      this,
                                      dwEffectivePeriod,
                                      dwEffectivePeriod,
@@ -222,13 +210,13 @@ void CursorBlinker::KillCaretTimer()
 
         bRet = DeleteTimerQueueTimer(_hCaretBlinkTimerQueue,
                                      _hCaretBlinkTimer,
-                                     nullptr);
+                                     NULL);
 
         // According to https://msdn.microsoft.com/en-us/library/windows/desktop/ms682569(v=vs.85).aspx
         // A failure to delete the timer with the LastError being ERROR_IO_PENDING means that the timer is
         // currently in use and will get cleaned up when released. Delete should not be called again.
         // We treat that case as a success.
-        if (!bRet && GetLastError() != ERROR_IO_PENDING)
+        if (bRet == false && GetLastError() != ERROR_IO_PENDING)
         {
             LOG_LAST_ERROR();
         }

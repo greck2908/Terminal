@@ -1,9 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
+
 #include "precomp.h"
 
-#include "../inc/FontInfo.hpp"
+#include "..\inc\FontInfo.hpp"
 
 bool operator==(const FontInfo& a, const FontInfo& b)
 {
@@ -12,24 +13,25 @@ bool operator==(const FontInfo& a, const FontInfo& b)
             a._coordSizeUnscaled == b._coordSizeUnscaled);
 }
 
-FontInfo::FontInfo(const std::wstring_view faceName,
-                   const unsigned char family,
-                   const unsigned int weight,
+FontInfo::FontInfo(_In_ PCWSTR const pwszFaceName,
+                   const BYTE bFamily,
+                   const LONG lWeight,
                    const COORD coordSize,
-                   const unsigned int codePage,
-                   const bool fSetDefaultRasterFont /* = false */) :
-    FontInfoBase(faceName, family, weight, fSetDefaultRasterFont, codePage),
-    _coordSize(coordSize),
-    _coordSizeUnscaled(coordSize)
+                   const UINT uiCodePage,
+                   const bool fSetDefaultRasterFont /*= false*/) :
+                   FontInfoBase(pwszFaceName, bFamily, lWeight, fSetDefaultRasterFont, uiCodePage),
+                   _coordSize(coordSize),
+                   _coordSizeUnscaled(coordSize)
 {
     ValidateFont();
 }
 
 FontInfo::FontInfo(const FontInfo& fiFont) :
-    FontInfoBase(fiFont),
-    _coordSize(fiFont.GetSize()),
-    _coordSizeUnscaled(fiFont.GetUnscaledSize())
+                   FontInfoBase(fiFont),
+                   _coordSize(fiFont.GetSize()),
+                   _coordSizeUnscaled(fiFont.GetUnscaledSize())
 {
+
 }
 
 COORD FontInfo::GetUnscaledSize() const
@@ -42,16 +44,17 @@ COORD FontInfo::GetSize() const
     return _coordSize;
 }
 
-void FontInfo::SetFromEngine(const std::wstring_view faceName,
-                             const unsigned char family,
-                             const unsigned int weight,
+
+void FontInfo::SetFromEngine(_In_ PCWSTR const pwszFaceName,
+                             const BYTE bFamily,
+                             const LONG lWeight,
                              const bool fSetDefaultRasterFont,
                              const COORD coordSize,
                              const COORD coordSizeUnscaled)
 {
-    FontInfoBase::SetFromEngine(faceName,
-                                family,
-                                weight,
+    FontInfoBase::SetFromEngine(pwszFaceName,
+                                bFamily,
+                                lWeight,
                                 fSetDefaultRasterFont);
 
     _coordSize = coordSize;
@@ -86,4 +89,14 @@ void FontInfo::_ValidateCoordSize()
             _coordSizeUnscaled = _coordSize;
         }
     }
+}
+
+#pragma warning(push)
+#pragma warning(suppress:4356)
+Microsoft::Console::Render::IFontDefaultList* FontInfo::s_pFontDefaultList;
+#pragma warning(pop)
+
+void FontInfo::s_SetFontDefaultList(_In_ Microsoft::Console::Render::IFontDefaultList* const pFontDefaultList)
+{
+    FontInfoBase::s_SetFontDefaultList(pFontDefaultList);
 }

@@ -14,13 +14,14 @@ Author(s):
 - Mike Griese (MiGrie) 2017
 --*/
 
+
 #include <windows.h>
-#include <wil/result.h>
-#include <wil/resource.h>
+#include <wil\result.h>
+#include <wil\resource.h>
 
 #include <string>
 
-typedef void (*PipeReadCallback)(BYTE* buffer, DWORD dwRead);
+typedef void(*PipeReadCallback)(BYTE* buffer, DWORD dwRead);
 
 class VtConsole
 {
@@ -43,7 +44,7 @@ public:
 
     void signalWindow(unsigned short sx, unsigned short sy);
 
-    static DWORD WINAPI StaticOutputThreadProc(LPVOID lpParameter);
+    static DWORD StaticOutputThreadProc(LPVOID lpParameter);
 
     bool WriteInput(std::string& seq);
 
@@ -56,9 +57,9 @@ private:
     PROCESS_INFORMATION _piPty;
     PROCESS_INFORMATION _piClient;
 
-    HANDLE _outPipe = INVALID_HANDLE_VALUE;
-    HANDLE _inPipe = INVALID_HANDLE_VALUE;
-    HANDLE _signalPipe = INVALID_HANDLE_VALUE;
+    HANDLE _outPipe;
+    HANDLE _inPipe;
+    HANDLE _signalPipe;
 
     HPCON _hPC;
 
@@ -69,8 +70,8 @@ private:
 
     PipeReadCallback _pfnReadCallback;
 
-    DWORD _dwOutputThreadId = 0;
-    HANDLE _hOutputThread = nullptr;
+    DWORD _dwOutputThreadId;
+    HANDLE _hOutputThread = INVALID_HANDLE_VALUE;
 
     void _createPseudoConsole(const std::wstring& command);
     void _createConptyManually(const std::wstring& command);
@@ -79,4 +80,5 @@ private:
     void _spawn(const std::wstring& command);
 
     DWORD _OutputThread();
+
 };

@@ -10,10 +10,6 @@
 #define ENGLISH_US_CP 437u
 #define JAPANESE_CP 932u
 
-using WEX::Logging::Log;
-using WEX::TestExecution::TestData;
-using namespace WEX::Common;
-
 namespace DbcsWriteRead
 {
     enum WriteMode
@@ -44,21 +40,15 @@ namespace DbcsWriteRead
                _Out_ HANDLE* const phOut,
                _Out_ WORD* const pwAttributes);
 
-    void SendOutput(const HANDLE hOut,
-                    _In_ unsigned int const uiCodePage,
-                    const WriteMode WriteMode,
-                    const bool fIsUnicode,
-                    _In_ PCSTR pszTestString,
-                    const WORD wAttr);
+    void SendOutput(const HANDLE hOut, _In_ unsigned int const uiCodePage,
+                    const WriteMode WriteMode, const bool fIsUnicode,
+                    _In_ PCSTR pszTestString, const WORD wAttr);
 
     void RetrieveOutput(const HANDLE hOut,
-                        const DbcsWriteRead::ReadMode ReadMode,
-                        const bool fReadUnicode,
-                        _Out_writes_(cChars) CHAR_INFO* const rgChars,
-                        const SHORT cChars);
+                        const DbcsWriteRead::ReadMode ReadMode, const bool fReadUnicode,
+                        _Out_writes_(cChars) CHAR_INFO* const rgChars, const SHORT cChars);
 
-    void Verify(_In_reads_(cExpected) CHAR_INFO* const rgExpected,
-                const size_t cExpected,
+    void Verify(_In_reads_(cExpected) CHAR_INFO* const rgExpected, const size_t cExpected,
                 _In_reads_(cExpected) CHAR_INFO* const rgActual);
 
     void PrepExpected(_In_ unsigned int const uiCodePage,
@@ -94,6 +84,7 @@ namespace DbcsWriteRead
                                         const bool fReadWithUnicode,
                                         _Inout_updates_all_(cExpectedNeeded) CHAR_INFO* const rgciExpected,
                                         const size_t cExpectedNeeded);
+
 
     namespace PrepPattern
     {
@@ -228,6 +219,13 @@ class DbcsTests
 {
     BEGIN_TEST_CLASS(DbcsTests)
         TEST_CLASS_PROPERTY(L"IsolationLevel", L"Class")
+        TEST_CLASS_PROPERTY(L"BinaryUnderTest", L"conhost.exe")
+        TEST_CLASS_PROPERTY(L"ArtifactUnderTest", L"wincon.h")
+        TEST_CLASS_PROPERTY(L"ArtifactUnderTest", L"winconp.h")
+        TEST_CLASS_PROPERTY(L"ArtifactUnderTest", L"wincontypes.h")
+        TEST_CLASS_PROPERTY(L"ArtifactUnderTest", L"conmsgl1.h")
+        TEST_CLASS_PROPERTY(L"ArtifactUnderTest", L"conmsgl2.h")
+        TEST_CLASS_PROPERTY(L"ArtifactUnderTest", L"api-ms-win-core-console-l1-2-1.lib")
     END_TEST_CLASS();
 
     TEST_METHOD_SETUP(DbcsTestSetup);
@@ -275,6 +273,8 @@ class DbcsTests
         TEST_METHOD_PROPERTY(L"IsolationLevel", L"Method")
     END_TEST_METHOD()
 };
+
+HANDLE hScreen = INVALID_HANDLE_VALUE;
 
 bool DbcsTests::DbcsTestSetup()
 {
@@ -358,13 +358,11 @@ bool DbcsWriteRead::Setup(_In_ unsigned int uiCodePage,
     return true;
 }
 
-void DbcsWriteRead::SendOutput(const HANDLE hOut,
-                               _In_ unsigned int const uiCodePage,
-                               const DbcsWriteRead::WriteMode WriteMode,
-                               const bool fIsUnicode,
-                               _In_ PCSTR pszTestString,
-                               const WORD wAttr)
+void DbcsWriteRead::SendOutput(const HANDLE hOut, _In_ unsigned int const uiCodePage,
+                               const DbcsWriteRead::WriteMode WriteMode, const bool fIsUnicode,
+                               _In_ PCSTR pszTestString, const WORD wAttr)
 {
+
     // DBCS is very dependent on knowing the byte length in the original codepage of the input text.
     // Save off the original length of the string so we know what its A length was.
     SHORT const cTestString = (SHORT)strlen(pszTestString);
@@ -461,7 +459,7 @@ void DbcsWriteRead::SendOutput(const HANDLE hOut,
         }
 
         // This is the stated size of the buffer we're passing.
-        // This console API can treat the buffer as a 2D array. We're only doing 1 dimension so the Y is 1 and the X is the number of CHAR_INFO characters.
+        // This console API can treat the buffer as a 2D array. We're only doing 1 dimension so the Y is 1 and the X is the number of CHAR_INFO charcters.
         COORD coordBufferSize = { 0 };
         coordBufferSize.Y = 1;
         coordBufferSize.X = cChars;
@@ -1393,6 +1391,7 @@ void DbcsWriteRead::PrepPattern::ACoverAttrSpacePaddedDedupeTruncatedW(_In_ unsi
             pciExpected[i].Attributes |= COMMON_LVB_TRAILING_BYTE;
             fIsNextTrailing = false;
         }
+
     }
 
     for (; i < cExpected; i++)
@@ -1703,10 +1702,8 @@ void DbcsWriteRead::PrepExpected(_In_ unsigned int const uiCodePage,
 }
 
 void DbcsWriteRead::RetrieveOutput(const HANDLE hOut,
-                                   const DbcsWriteRead::ReadMode ReadMode,
-                                   const bool fReadUnicode,
-                                   _Out_writes_(cChars) CHAR_INFO* const rgChars,
-                                   const SHORT cChars)
+                                   const DbcsWriteRead::ReadMode ReadMode, const bool fReadUnicode,
+                                   _Out_writes_(cChars) CHAR_INFO* const rgChars, const SHORT cChars)
 {
     COORD coordBufferTarget = { 0 };
 
@@ -1786,8 +1783,7 @@ void DbcsWriteRead::RetrieveOutput(const HANDLE hOut,
     }
 }
 
-void DbcsWriteRead::Verify(_In_reads_(cExpected) CHAR_INFO* const rgExpected,
-                           const size_t cExpected,
+void DbcsWriteRead::Verify(_In_reads_(cExpected) CHAR_INFO* const rgExpected, const size_t cExpected,
                            _In_reads_(cExpected) CHAR_INFO* const rgActual)
 {
     // We will walk through for the number of CHAR_INFOs expected.
@@ -1957,6 +1953,7 @@ void DbcsTests::TestDbcsWriteRead()
                               fReadInUnicode);
 
     Log::Comment(testInfo);
+
 }
 
 // This test covers bisect-prevention handling. This is the behavior where a double-wide character will not be spliced
@@ -2253,8 +2250,8 @@ struct MultibyteInputData
     PCSTR pszExpectedText;
 };
 
-// clang-format off
-const MultibyteInputData MultibyteTestDataSet[] = {
+const MultibyteInputData MultibyteTestDataSet[] =
+{
     { L"\x3042", "\x82\xa0" },
     { L"\x3042" L"3", "\x82\xa0\x33" },
     { L"3" L"\x3042", "\x33\x82\xa0" },
@@ -2262,7 +2259,6 @@ const MultibyteInputData MultibyteTestDataSet[] = {
     { L"3" L"\x3042" L"\x3044" L"\x3042", "\x33\x82\xa0\x82\xa2\x82\xa0" },
     { L"3" L"\x3042" L"\x3044" L"\x3042" L"\x3044", "\x33\x82\xa0\x82\xa2\x82\xa0\x82\xa2" },
 };
-// clang-format on
 
 void WriteStringToInput(HANDLE hIn, PCWSTR pwszString)
 {
@@ -2321,7 +2317,7 @@ void ReadStringWithReadConsoleInputAHelper(HANDLE hIn, PCSTR pszExpectedText, si
     while (cchRead < cchExpectedText)
     {
         // expected read is either the size of the buffer or the number of characters remaining, whichever is smaller.
-        DWORD const dwReadExpected = (DWORD)std::min(cbBuffer, cchExpectedText - cchRead);
+        DWORD const dwReadExpected = (DWORD)min(cbBuffer, cchExpectedText - cchRead);
 
         DWORD dwRead;
         if (!VERIFY_WIN32_BOOL_SUCCEEDED(ReadConsoleInputA(hIn, irRead, (DWORD)cbBuffer, &dwRead), L"Attempt to read input into buffer."))
@@ -2542,4 +2538,5 @@ void DbcsTests::TestDbcsStdCoutScenario()
     VERIFY_WIN32_BOOL_SUCCEEDED(ReadConsoleOutputCharacterA(hOut, psReadBack.get(), cchReadBack, coordReadPos, &dwRead), L"Read back std::cout line.");
     VERIFY_ARE_EQUAL(cchReadBack, dwRead, L"We should have read as many characters as we expected (length of original printed line.)");
     VERIFY_ARE_EQUAL(String(test), String(psReadBack.get()), L"String should match what we wrote.");
+
 }
