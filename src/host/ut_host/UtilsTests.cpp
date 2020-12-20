@@ -3,17 +3,17 @@
 
 #include "precomp.h"
 #include "WexTestClass.h"
-#include "..\..\inc\consoletaeftemplates.hpp"
+#include "../../inc/consoletaeftemplates.hpp"
 
 #include "CommonState.hpp"
 
 #include "globals.h"
 
-#include <time.h>
+#include <ctime>
 
 #include "utils.hpp"
 
-#include "..\interactivity\inc\ServiceLocator.hpp"
+#include "../interactivity/inc/ServiceLocator.hpp"
 
 using namespace WEX::Common;
 using namespace WEX::Logging;
@@ -32,7 +32,7 @@ class UtilsTests
         m_state->PrepareGlobalFont();
         m_state->PrepareGlobalScreenBuffer();
 
-        UINT const seed = (UINT)time(NULL);
+        UINT const seed = (UINT)time(nullptr);
         Log::Comment(String().Format(L"Setting random seed to : %d", seed));
         srand(seed);
 
@@ -72,7 +72,7 @@ class UtilsTests
         Log::Comment(String().Format(L"Coordinates - A: (%d, %d) B: (%d, %d)", coordA.X, coordA.Y, coordB.X, coordB.Y));
     }
 
-    void SubtractRandom(short &psValue)
+    void SubtractRandom(short& psValue)
     {
         SHORT const sRand = RandomShort();
         psValue -= gsl::narrow<SHORT>(std::max(sRand % psValue, 1));
@@ -84,7 +84,7 @@ class UtilsTests
         COORD coordA;
         COORD coordB;
 
-        // Set the buffer size to be able to accomodate large values.
+        // Set the buffer size to be able to accommodate large values.
         COORD coordMaxBuffer;
         coordMaxBuffer.X = SHORT_MAX;
         coordMaxBuffer.Y = SHORT_MAX;

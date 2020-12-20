@@ -21,13 +21,12 @@ Abstract:
 #include <windows.h>
 #include <wincon.h>
 
-#include "..\..\types\inc\viewport.hpp"
-#include "..\..\inc\operators.hpp"
+#include "../../types/inc/viewport.hpp"
+#include "../../inc/operators.hpp"
 
 #ifndef _NTSTATUS_DEFINED
 #define _NTSTATUS_DEFINED
 typedef _Return_type_success_(return >= 0) long NTSTATUS;
 #endif
 
-#define NT_SUCCESS(Status)  (((NTSTATUS)(Status)) >= 0)
-
+#define NT_SUCCESS(Status) (((NTSTATUS)(Status)) >= 0)

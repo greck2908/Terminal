@@ -17,7 +17,7 @@ INPUT_RECORD KeyEvent::ToInputRecord() const noexcept
     record.Event.KeyEvent.wVirtualKeyCode = _virtualKeyCode;
     record.Event.KeyEvent.wVirtualScanCode = _virtualScanCode;
     record.Event.KeyEvent.uChar.UnicodeChar = _charData;
-    record.Event.KeyEvent.dwControlKeyState = _activeModifierKeys;
+    record.Event.KeyEvent.dwControlKeyState = GetActiveModifierKeys();
     return record;
 }
 
@@ -30,7 +30,6 @@ void KeyEvent::SetKeyDown(const bool keyDown) noexcept
 {
     _keyDown = keyDown;
 }
-
 
 void KeyEvent::SetRepeatCount(const WORD repeatCount) noexcept
 {
@@ -54,19 +53,23 @@ void KeyEvent::SetCharData(const wchar_t character) noexcept
 
 void KeyEvent::SetActiveModifierKeys(const DWORD activeModifierKeys) noexcept
 {
-    _activeModifierKeys = activeModifierKeys;
+    _activeModifierKeys = static_cast<KeyEvent::Modifiers>(activeModifierKeys);
 }
 
 void KeyEvent::DeactivateModifierKey(const ModifierKeyState modifierKey) noexcept
 {
     DWORD const bitFlag = ToConsoleControlKeyFlag(modifierKey);
-    WI_ClearAllFlags(_activeModifierKeys, bitFlag);
+    auto keys = GetActiveModifierKeys();
+    WI_ClearAllFlags(keys, bitFlag);
+    SetActiveModifierKeys(keys);
 }
 
 void KeyEvent::ActivateModifierKey(const ModifierKeyState modifierKey) noexcept
 {
     DWORD const bitFlag = ToConsoleControlKeyFlag(modifierKey);
-    WI_SetAllFlags(_activeModifierKeys, bitFlag);
+    auto keys = GetActiveModifierKeys();
+    WI_SetAllFlags(keys, bitFlag);
+    SetActiveModifierKeys(keys);
 }
 
 bool KeyEvent::DoActiveModifierKeysMatch(const std::unordered_set<ModifierKeyState>& consoleModifiers) const noexcept
@@ -76,7 +79,7 @@ bool KeyEvent::DoActiveModifierKeysMatch(const std::unordered_set<ModifierKeySta
     {
         WI_SetAllFlags(consoleBits, ToConsoleControlKeyFlag(mod));
     }
-    return consoleBits == _activeModifierKeys;
+    return consoleBits == GetActiveModifierKeys();
 }
 
 // Routine Description:

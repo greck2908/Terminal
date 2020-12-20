@@ -13,9 +13,9 @@ Author(s):
 - Austin Diviness (AustDi) 04-Jun-2018
 --*/
 
-
 #pragma once
 
+#include "boost/container/small_vector.hpp"
 #include "TextAttribute.hpp"
 #include "TextAttributeRun.hpp"
 
@@ -30,33 +30,52 @@ public:
     using pointer = TextAttribute*;
     using reference = TextAttribute&;
 
-    static AttrRowIterator CreateEndIterator(const ATTR_ROW* const attrRow);
+    static AttrRowIterator CreateEndIterator(const ATTR_ROW* const attrRow) noexcept;
 
-    AttrRowIterator(const ATTR_ROW* const attrRow);
+    AttrRowIterator(const ATTR_ROW* const attrRow) noexcept;
 
     operator bool() const noexcept;
 
-    bool operator==(const AttrRowIterator& it) const;
-    bool operator!=(const AttrRowIterator& it) const;
+    bool operator==(const AttrRowIterator& it) const noexcept;
+    bool operator!=(const AttrRowIterator& it) const noexcept;
 
-    AttrRowIterator& operator++();
-    AttrRowIterator operator++(int);
+    AttrRowIterator& operator++() noexcept
+    {
+        _increment(1);
+        return *this;
+    }
+    AttrRowIterator operator++(int) noexcept
+    {
+        auto copy = *this;
+        _increment(1);
+        return copy;
+    }
 
     AttrRowIterator& operator+=(const ptrdiff_t& movement);
     AttrRowIterator& operator-=(const ptrdiff_t& movement);
 
-    AttrRowIterator& operator--();
-    AttrRowIterator operator--(int);
+    AttrRowIterator& operator--() noexcept
+    {
+        _decrement(1);
+        return *this;
+    }
+    AttrRowIterator operator--(int) noexcept
+    {
+        auto copy = *this;
+        _decrement(1);
+        return copy;
+    }
 
     const TextAttribute* operator->() const;
     const TextAttribute& operator*() const;
 
 private:
-    std::vector<TextAttributeRun>::const_iterator _run;
+    boost::container::small_vector_base<TextAttributeRun>::const_iterator _run;
     const ATTR_ROW* _pAttrRow;
     size_t _currentAttributeIndex; // index of TextAttribute within the current TextAttributeRun
-    
-    void _increment(size_t count);
-    void _decrement(size_t count);
-    void _setToEnd();
+    bool _exceeded;
+
+    void _increment(size_t count) noexcept;
+    void _decrement(size_t count) noexcept;
+    void _setToEnd() noexcept;
 };

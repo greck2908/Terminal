@@ -3,7 +3,7 @@
 
 #include "precomp.h"
 
-#include "search.h"
+#include "../buffer/out/search.h"
 
 #include "../interactivity/inc/ServiceLocator.hpp"
 #include "../types/inc/convert.hpp"
@@ -11,7 +11,7 @@
 #include <algorithm>
 
 using namespace Microsoft::Console::Types;
-
+using Microsoft::Console::Interactivity::ServiceLocator;
 // Routine Description:
 // - Handles a keyboard event for extending the current selection
 // - Must be called when the console is in selecting state.
@@ -76,7 +76,8 @@ Selection::KeySelectionEventResult Selection::HandleKeySelectionEvent(const INPU
         }
 
         // if in mouse selection mode and user hits a key, cancel selection
-        if (!IsSystemKey(wVirtualKeyCode)) {
+        if (!IsSystemKey(wVirtualKeyCode))
+        {
             ClearSelection();
         }
     }
@@ -246,17 +247,17 @@ COORD Selection::WordByWordSelection(const bool fReverse,
         // - Then we want to keep going UNTIL (!) we move from a delimiter (fPrevIsDelim) to a normal character (!fCurrIsDelim)
         //   This will then eat up all delimiters after a word and stop once we reach the first letter of the next word.
         // If we're going Right to Left (fReverse)...
-        // - Then we want to keep going UNTIL (!) we move from a normal character (!fPrevIsDelim) to a delimeter (fCurrIsDelim)
+        // - Then we want to keep going UNTIL (!) we move from a normal character (!fPrevIsDelim) to a delimiter (fCurrIsDelim)
         //   This will eat up all letters of the word and stop once we see the delimiter before the word.
     } while (!fReverse ? !(fPrevIsDelim && !fCurrIsDelim) : !(!fPrevIsDelim && fCurrIsDelim));
 
-    // To stop the loop, we had to move the cursor one too far to figure out that the delta occurred from delimeter to not (or vice versa)
+    // To stop the loop, we had to move the cursor one too far to figure out that the delta occurred from delimiter to not (or vice versa)
     // Therefore move back by one character after proceeding through the loop.
     // EXCEPT:
     // 1. If we broke out of the loop by reaching the beginning of the buffer, leave it alone.
     // 2. If we're un-highlighting a region, also leave it alone.
     //    This is an oddity that occurs because our cursor is on a character, not between two characters like most text editors.
-    //    We want the current position to be ON the first letter of the word (or the last delimeter after the word) so it stays highlighted.
+    //    We want the current position to be ON the first letter of the word (or the last delimiter after the word) so it stays highlighted.
     if (fMoveSucceeded && !fUnhighlighting)
     {
         if (!fReverse)
@@ -389,7 +390,7 @@ bool Selection::HandleKeyboardLineSelectionEvent(const INPUT_KEY_INFO* const pIn
             // shift + pgup/pgdn extends selection up or down one full screen
         case VK_NEXT:
         {
-            coordSelPoint.Y += sWindowHeight; // TODO: potential overflow
+            coordSelPoint.Y = base::CheckAdd(coordSelPoint.Y, sWindowHeight).ValueOrDefault(bufferSize.BottomInclusive());
             if (coordSelPoint.Y > bufferSize.BottomInclusive())
             {
                 coordSelPoint.Y = bufferSize.BottomInclusive();
@@ -398,7 +399,7 @@ bool Selection::HandleKeyboardLineSelectionEvent(const INPUT_KEY_INFO* const pIn
         }
         case VK_PRIOR:
         {
-            coordSelPoint.Y -= sWindowHeight; // TODO: potential underflow
+            coordSelPoint.Y = base::CheckSub(coordSelPoint.Y, sWindowHeight).ValueOrDefault(bufferSize.Top());
             if (coordSelPoint.Y < bufferSize.Top())
             {
                 coordSelPoint.Y = bufferSize.Top();
@@ -638,7 +639,7 @@ bool Selection::_HandleColorSelection(const INPUT_KEY_INFO* const pInputKeyInfo)
     // If it is line selection, we can assemble that across multiple lines to make a search term.
     // But if it is block selection and the selected area is > 1 line in height, ignore the shift because we can't search.
     // Also ignore if there is no current selection.
-    if ((fShiftPressed) && (!IsAreaSelected() || (!IsLineSelection() && (_srSelectionRect.Top != _srSelectionRect.Bottom ))))
+    if ((fShiftPressed) && (!IsAreaSelected() || (!IsLineSelection() && (_srSelectionRect.Top != _srSelectionRect.Bottom))))
     {
         fShiftPressed = false;
     }
@@ -659,17 +660,20 @@ bool Selection::_HandleColorSelection(const INPUT_KEY_INFO* const pInputKeyInfo)
     //  ALT+n => fg,  CTRL+n => bg
     if (fAltPressed || fCtrlPressed)
     {
-        ULONG ulAttr = wVirtualKeyCode - '0' + 6;
+        TextAttribute selectionAttr;
+        const BYTE colorIndex = gsl::narrow_cast<BYTE>(wVirtualKeyCode - '0' + 6);
 
         if (fCtrlPressed)
         {
             //  Setting background color.  Set fg color to black.
-            ulAttr <<= 4;
+            selectionAttr.SetIndexedBackground256(colorIndex);
+            selectionAttr.SetIndexedForeground256(0);
         }
         else
         {
             // Set foreground color. Maintain the current console bg color.
-            ulAttr |= gci.GetActiveOutputBuffer().GetAttributes().GetLegacyAttributes() & 0xf0;
+            selectionAttr = gci.GetActiveOutputBuffer().GetAttributes();
+            selectionAttr.SetIndexedForeground256(colorIndex);
         }
 
         // If shift was pressed as well, then this is actually a
@@ -688,12 +692,13 @@ bool Selection::_HandleColorSelection(const INPUT_KEY_INFO* const pInputKeyInfo)
                     std::wstring str;
                     for (const auto& selectRect : selectionRects)
                     {
-                        auto it = screenInfo.GetTextDataAt(COORD{ selectRect.Left, selectRect.Top });
+                        auto it = screenInfo.GetCellDataAt(COORD{ selectRect.Left, selectRect.Top });
 
-                        for (SHORT i = 0; i < (selectRect.Right - selectRect.Left + 1); ++i)
+                        for (SHORT i = 0; i < (selectRect.Right - selectRect.Left + 1);)
                         {
-                            str.append((*it).begin(), (*it).end());
-                            it++;
+                            str.append(it->Chars());
+                            i += gsl::narrow_cast<SHORT>(it->Columns());
+                            it += it->Columns();
                         }
                     }
 
@@ -702,10 +707,10 @@ bool Selection::_HandleColorSelection(const INPUT_KEY_INFO* const pInputKeyInfo)
 
                     Telemetry::Instance().LogColorSelectionUsed();
 
-                    Search search(screenInfo, str, Search::Direction::Forward, Search::Sensitivity::CaseInsensitive);
+                    Search search(gci.renderData, str, Search::Direction::Forward, Search::Sensitivity::CaseInsensitive);
                     while (search.FindNext())
                     {
-                        search.Color(TextAttribute{ static_cast<WORD>(ulAttr) });
+                        search.Color(selectionAttr);
                     }
                 }
             }
@@ -713,7 +718,11 @@ bool Selection::_HandleColorSelection(const INPUT_KEY_INFO* const pInputKeyInfo)
         }
         else
         {
-            ColorSelection(_srSelectionRect, TextAttribute{ static_cast<WORD>(ulAttr) });
+            const auto selectionRects = GetSelectionRects();
+            for (const auto& selectionRect : selectionRects)
+            {
+                ColorSelection(selectionRect, selectionAttr);
+            }
             ClearSelection();
         }
 
@@ -927,7 +936,7 @@ bool Selection::_HandleMarkModeSelectionNav(const INPUT_KEY_INFO* const pInputKe
     return false;
 }
 
-#pragma region Calculation/Support for keyboard selection
+#pragma region Calculation / Support for keyboard selection
 
 // Routine Description:
 // - Retrieves the boundaries of the input line (first and last char positions)
@@ -936,8 +945,7 @@ bool Selection::_HandleMarkModeSelectionNav(const INPUT_KEY_INFO* const pInputKe
 // - pcoordInputEnd - Position of the last character in the input line
 // Return Value:
 // - If true, the boundaries returned are valid. If false, they should be discarded.
-[[nodiscard]]
-bool Selection::s_GetInputLineBoundaries(_Out_opt_ COORD* const pcoordInputStart, _Out_opt_ COORD* const pcoordInputEnd)
+[[nodiscard]] bool Selection::s_GetInputLineBoundaries(_Out_opt_ COORD* const pcoordInputStart, _Out_opt_ COORD* const pcoordInputEnd)
 {
     const CONSOLE_INFORMATION& gci = ServiceLocator::LocateGlobals().getConsoleInformation();
     const auto bufferSize = gci.GetActiveOutputBuffer().GetBufferSize();

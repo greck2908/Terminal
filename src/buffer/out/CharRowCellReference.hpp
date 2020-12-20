@@ -23,18 +23,17 @@ class CharRow;
 class CharRowCellReference final
 {
 public:
-
     using const_iterator = const wchar_t*;
 
-    CharRowCellReference(CharRow& parent, const size_t index) :
+    CharRowCellReference(CharRow& parent, const size_t index) noexcept :
         _parent{ parent },
         _index{ index }
     {
     }
 
     ~CharRowCellReference() = default;
-    CharRowCellReference(const CharRowCellReference&) = default;
-    CharRowCellReference(CharRowCellReference&&) = default;
+    CharRowCellReference(const CharRowCellReference&) noexcept = default;
+    CharRowCellReference(CharRowCellReference&&) noexcept = default;
 
     void operator=(const CharRowCellReference&) = delete;
     void operator=(CharRowCellReference&&) = delete;
@@ -44,7 +43,6 @@ public:
 
     const_iterator begin() const;
     const_iterator end() const;
-
 
     friend bool operator==(const CharRowCellReference& ref, const std::vector<wchar_t>& glyph);
     friend bool operator==(const std::vector<wchar_t>& glyph, const CharRowCellReference& ref);

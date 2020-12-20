@@ -5,7 +5,7 @@
 
 #include "precomp.h"
 
-#include "..\..\server\ProcessHandle.h"
+#include "../../server/ProcessHandle.h"
 
 #pragma hdrstop
 
@@ -25,4 +25,4 @@ BOOL HandleMouseEvent(const SCREEN_INFORMATION& ScreenInfo,
                       const LPARAM lParam);
 
 VOID SetConsoleWindowOwner(const HWND hwnd, _Inout_opt_ ConsoleProcessHandle* pProcessData);
-DWORD ConsoleInputThreadProcWin32(LPVOID lpParameter);
+DWORD WINAPI ConsoleInputThreadProcWin32(LPVOID lpParameter);

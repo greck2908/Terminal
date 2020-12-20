@@ -1,3 +1,5 @@
+ARM64X_EC_ENABLED=1
+
 !include ..\project.inc
 
 # -------------------------------------
@@ -45,4 +47,5 @@ SOURCES = \
     TrueTypeFontList.cpp \
 
 INCLUDES = \
+    $(INCLUDES); \
     ..\inc; \

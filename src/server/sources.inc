@@ -37,8 +37,9 @@ SOURCES= \
     ..\ApiMessage.cpp \
     ..\ApiMessageState.cpp \
     ..\ApiSorter.cpp \
-    ..\DeviceComm.cpp \
+    ..\ConDrvDeviceComm.cpp \
     ..\DeviceHandle.cpp \
+    ..\ConsoleShimPolicy.cpp \
     ..\Entrypoints.cpp \
     ..\IoDispatchers.cpp \
     ..\IoSorter.cpp \

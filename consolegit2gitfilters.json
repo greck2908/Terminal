@@ -12,7 +12,16 @@
     "/ipch/",
     "/dep/",
     "/.vs/",
-    "/build/"
+    "/build/",
+    "/src/cascadia/",
+    "/src/winconpty/",
+    "/.nuget/",
+    "/.github/",
+    "/samples/",
+    "/res/terminal/",
+    "/doc/specs/",
+    "/doc/cascadia/",
+    "/doc/user-docs/"
   ],
   "SuffixFilters": [
     ".dbb",
@@ -27,6 +36,7 @@
     ".db",
     ".wrn",
     ".rec",
-    ".err"
+    ".err",
+    ".xlsx"
   ]    
 }

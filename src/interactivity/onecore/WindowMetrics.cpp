@@ -6,23 +6,23 @@
 #include "WindowMetrics.hpp"
 #include "ConIoSrvComm.hpp"
 
-#include "..\..\renderer\wddmcon\wddmconrenderer.hpp"
+#include "../../renderer/wddmcon/wddmconrenderer.hpp"
 
-#include "..\inc\ServiceLocator.hpp"
+#include "../inc/ServiceLocator.hpp"
 
 #pragma hdrstop
 
 // Default metrics for when in headless mode.
-#define HEADLESS_FONT_SIZE_WIDTH      (8)
-#define HEADLESS_FONT_SIZE_HEIGHT     (12)
-#define HEADLESS_DISPLAY_SIZE_WIDTH   (80)
-#define HEADLESS_DISPLAY_SIZE_HEIGHT  (25)
+#define HEADLESS_FONT_SIZE_WIDTH (8)
+#define HEADLESS_FONT_SIZE_HEIGHT (12)
+#define HEADLESS_DISPLAY_SIZE_WIDTH (80)
+#define HEADLESS_DISPLAY_SIZE_HEIGHT (25)
 
 using namespace Microsoft::Console::Interactivity::OneCore;
 
 RECT WindowMetrics::GetMinClientRectInPixels()
 {
-    ConIoSrvComm *Server;
+    ConIoSrvComm* Server;
 
     NTSTATUS Status;
 
